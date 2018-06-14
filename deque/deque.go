@@ -3,13 +3,13 @@ package deque
 import (
 	"time"
 
-	"github.com/let-z-go/intrusive_containers"
+	"github.com/let-z-go/intrusive_containers/list"
 	"github.com/let-z-go/toolkit/semaphore"
 )
 
 type Deque struct {
 	semaphore semaphore.Semaphore
-	list      intrusive_containers.List
+	list      list.List
 }
 
 func (self *Deque) Initialize(maxNumberOfNodes int32) {
@@ -17,20 +17,20 @@ func (self *Deque) Initialize(maxNumberOfNodes int32) {
 	self.list.Initialize()
 }
 
-func (self *Deque) AppendNode(node *intrusive_containers.ListNode, timeout time.Duration) error {
+func (self *Deque) AppendNode(node *list.ListNode, timeout time.Duration) error {
 	return self.semaphore.Up(false, timeout, func() {
 		self.list.AppendNode(node)
 	})
 }
 
-func (self *Deque) PrependNode(node *intrusive_containers.ListNode, timeout time.Duration) error {
+func (self *Deque) PrependNode(node *list.ListNode, timeout time.Duration) error {
 	return self.semaphore.Up(false, timeout, func() {
 		self.list.PrependNode(node)
 	})
 }
 
-func (self *Deque) RemoveTail(commitNodeRemoval bool, timeout time.Duration) (*intrusive_containers.ListNode, error) {
-	node := (*intrusive_containers.ListNode)(nil)
+func (self *Deque) RemoveTail(commitNodeRemoval bool, timeout time.Duration) (*list.ListNode, error) {
+	node := (*list.ListNode)(nil)
 
 	return node, self.semaphore.Down(!commitNodeRemoval, timeout, func() {
 		node = self.list.GetTail()
@@ -38,8 +38,8 @@ func (self *Deque) RemoveTail(commitNodeRemoval bool, timeout time.Duration) (*i
 	})
 }
 
-func (self *Deque) RemoveHead(commitNodeRemoval bool, timeout time.Duration) (*intrusive_containers.ListNode, error) {
-	node := (*intrusive_containers.ListNode)(nil)
+func (self *Deque) RemoveHead(commitNodeRemoval bool, timeout time.Duration) (*list.ListNode, error) {
+	node := (*list.ListNode)(nil)
 
 	return node, self.semaphore.Down(!commitNodeRemoval, timeout, func() {
 		node = self.list.GetHead()
@@ -47,7 +47,7 @@ func (self *Deque) RemoveHead(commitNodeRemoval bool, timeout time.Duration) (*i
 	})
 }
 
-func (self *Deque) RemoveAllNodes(commitNodeRemovals bool, timeout time.Duration, nodeList *intrusive_containers.List) error {
+func (self *Deque) RemoveAllNodes(commitNodeRemovals bool, timeout time.Duration, nodeList *list.List) error {
 	return self.semaphore.DownAll(!commitNodeRemovals, timeout, func() {
 		self.list.Append(nodeList)
 	})

@@ -6,12 +6,12 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/let-z-go/intrusive_containers"
+	"github.com/let-z-go/intrusive_containers/list"
 )
 
 type Foo struct {
 	bar      int
-	listNode intrusive_containers.ListNode
+	listNode list.ListNode
 }
 
 func TestDeque(t *testing.T) {
@@ -41,7 +41,7 @@ func TestDeque(t *testing.T) {
 		t.Errorf("%#v", f2)
 	}
 
-	var ln *intrusive_containers.ListNode
+	var ln *list.ListNode
 	ln, _ = d.RemoveHead(true, -1)
 
 	if f := (*Foo)(ln.GetContainer(unsafe.Offsetof(Foo{}.listNode))); f.bar != 1 {

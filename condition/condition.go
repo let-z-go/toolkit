@@ -6,13 +6,13 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/let-z-go/intrusive_containers"
+	"github.com/let-z-go/intrusive_containers/list"
 )
 
 type Condition struct {
 	lock        sync.Locker
-	waiterList1 intrusive_containers.List
-	waiterList2 intrusive_containers.List
+	waiterList1 list.List
+	waiterList2 list.List
 }
 
 func (self *Condition) Initialize(lock sync.Locker) {
@@ -68,7 +68,7 @@ func (self *Condition) Broadcast() {
 }
 
 type conditionWaiter struct {
-	listNode intrusive_containers.ListNode
+	listNode list.ListNode
 	event    chan byte
 }
 
