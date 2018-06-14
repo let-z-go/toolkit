@@ -51,6 +51,40 @@ func (self *Semaphore) UpAll(increaseMinValue bool, timeout time.Duration, callb
 	return self.doUp(true, increaseMinValue, timeout, callback)
 }
 
+func (self *Semaphore) IncreaseMaxValue(increment int32) {
+	if self.IsClosed() {
+		panic(SemaphoreClosedError)
+	}
+
+	if increment < 1 {
+		return
+	}
+
+	maxValue := self.maxValue
+	self.maxValue += increment
+
+	if self.value == maxValue {
+		self.notifyUpWaiter()
+	}
+}
+
+func (self *Semaphore) DecreaseMinValue(decrement int32) {
+	if self.IsClosed() {
+		panic(SemaphoreClosedError)
+	}
+
+	if decrement < 1 {
+		return
+	}
+
+	minValue := self.minValue
+	self.minValue += decrement
+
+	if self.value == minValue {
+		self.notifyDownWaiter()
+	}
+}
+
 func (self *Semaphore) Close(closingError error, callback func()) error {
 	if !atomic.CompareAndSwapInt32(&self.isClosed, 0, -1) {
 		panic(SemaphoreClosedError)

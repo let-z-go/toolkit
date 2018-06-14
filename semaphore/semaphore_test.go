@@ -41,11 +41,11 @@ func TestDownAndUpSemaphore1(t *testing.T) {
 	wg.Wait()
 
 	if sc != 52 {
-		t.Errorf("%#v != 52", sc)
+		t.Errorf("%#v", sc)
 	}
 
 	if fc != 48 {
-		t.Errorf("%#v != 48", fc)
+		t.Errorf("%#v", fc)
 	}
 }
 
@@ -82,10 +82,10 @@ func TestDownAndUpSemaphore2(t *testing.T) {
 	wg.Wait()
 
 	if sc != 50 {
-		t.Errorf("%#v != 50", sc)
+		t.Errorf("%#v", sc)
 	}
 
 	if fc != 50 {
-		t.Errorf("%#v != 50", fc)
+		t.Errorf("%#v", fc)
 	}
 }
