@@ -20,7 +20,6 @@ type Semaphore struct {
 	downCondition     condition.Condition
 	upCondition       condition.Condition
 	isClosed          int32
-	closingError      error
 }
 
 func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) {
@@ -51,51 +50,62 @@ func (self *Semaphore) UpAll(increaseMinValue bool, timeout time.Duration, callb
 	return self.doUp(true, increaseMinValue, timeout, callback)
 }
 
-func (self *Semaphore) IncreaseMaxValue(increment int32) {
+func (self *Semaphore) IncreaseMaxValue(increment int32, callback func()) error {
 	if self.IsClosed() {
-		panic(SemaphoreClosedError)
+		return SemaphoreClosedError
 	}
 
 	if increment < 1 {
-		return
+		return nil
 	}
 
+	self.lock.Lock()
 	maxValue := self.maxValue
 	self.maxValue += increment
 
 	if self.value == maxValue {
 		self.notifyUpWaiter()
 	}
+
+	if callback != nil {
+		callback()
+	}
+
+	self.lock.Unlock()
+	return nil
 }
 
-func (self *Semaphore) DecreaseMinValue(decrement int32) {
+func (self *Semaphore) DecreaseMinValue(decrement int32, callback func()) error {
 	if self.IsClosed() {
-		panic(SemaphoreClosedError)
+		return SemaphoreClosedError
 	}
 
 	if decrement < 1 {
-		return
+		return nil
 	}
 
+	self.lock.Lock()
 	minValue := self.minValue
 	self.minValue += decrement
 
 	if self.value == minValue {
 		self.notifyDownWaiter()
 	}
-}
 
-func (self *Semaphore) Close(closingError error, callback func()) error {
-	if !atomic.CompareAndSwapInt32(&self.isClosed, 0, -1) {
-		panic(SemaphoreClosedError)
+	if callback != nil {
+		callback()
 	}
 
-	if closingError == nil {
-		closingError = SemaphoreClosedError
+	self.lock.Unlock()
+	return nil
+}
+
+func (self *Semaphore) Close(callback func()) error {
+	if !atomic.CompareAndSwapInt32(&self.isClosed, 0, -1) {
+		return SemaphoreClosedError
 	}
 
 	self.lock.Lock()
-	self.closingError = closingError
 
 	if callback != nil {
 		callback()
@@ -113,13 +123,14 @@ func (self *Semaphore) IsClosed() bool {
 
 func (self *Semaphore) doDown(all bool, decreaseMaxValue bool, timeout time.Duration, callback func()) error {
 	if self.IsClosed() {
-		panic(SemaphoreClosedError)
+		return SemaphoreClosedError
 	}
 
 	self.lock.Lock()
 
-	if self.closingError != nil {
-		return self.closingError
+	if self.IsClosed() {
+		self.lock.Unlock()
+		return SemaphoreClosedError
 	}
 
 	if self.value == self.minValue {
@@ -131,9 +142,9 @@ func (self *Semaphore) doDown(all bool, decreaseMaxValue bool, timeout time.Dura
 				return SemaphoreTimedOutError
 			}
 
-			if self.closingError != nil {
+			if self.IsClosed() {
 				self.lock.Unlock()
-				return self.closingError
+				return SemaphoreClosedError
 			}
 
 			if self.value > self.minValue {
@@ -176,13 +187,14 @@ func (self *Semaphore) doDown(all bool, decreaseMaxValue bool, timeout time.Dura
 
 func (self *Semaphore) doUp(all bool, increaseMinValue bool, timeout time.Duration, callback func()) error {
 	if self.IsClosed() {
-		panic(SemaphoreClosedError)
+		return SemaphoreClosedError
 	}
 
 	self.lock.Lock()
 
-	if self.closingError != nil {
-		return self.closingError
+	if self.IsClosed() {
+		self.lock.Unlock()
+		return SemaphoreClosedError
 	}
 
 	if self.value == self.maxValue {
@@ -194,9 +206,9 @@ func (self *Semaphore) doUp(all bool, increaseMinValue bool, timeout time.Durati
 				return SemaphoreTimedOutError
 			}
 
-			if self.closingError != nil {
+			if self.IsClosed() {
 				self.lock.Unlock()
-				return self.closingError
+				return SemaphoreClosedError
 			}
 
 			if self.value < self.maxValue {

@@ -53,6 +53,12 @@ func (self *Deque) RemoveAllNodes(commitNodeRemovals bool, timeout time.Duration
 	})
 }
 
-func (self *Deque) CommitNodeRemovals(numberOfNodeRemovals int32) {
-	self.semaphore.IncreaseMaxValue(numberOfNodeRemovals)
+func (self *Deque) CommitNodeRemovals(numberOfNodeRemovals int32) error {
+	return self.semaphore.IncreaseMaxValue(numberOfNodeRemovals, nil)
+}
+
+func (self *Deque) Close() error {
+	return self.semaphore.Close(func() {
+		self.list.Initialize()
+	})
 }

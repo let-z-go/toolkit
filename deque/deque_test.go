@@ -1,12 +1,14 @@
 package deque
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 	"unsafe"
 
 	"github.com/let-z-go/intrusive_containers/list"
+	"github.com/let-z-go/toolkit/semaphore"
 )
 
 type Foo struct {
@@ -14,7 +16,7 @@ type Foo struct {
 	listNode list.ListNode
 }
 
-func TestDeque(t *testing.T) {
+func TestDeque1(t *testing.T) {
 	d := Deque{}
 	d.Initialize(2)
 	f := int32(0)
@@ -60,4 +62,35 @@ func TestDeque(t *testing.T) {
 		t.Errorf("%#v", f.bar)
 	}
 
+}
+
+func TestDeque2(t *testing.T) {
+	d := Deque{}
+	d.Initialize(3)
+	wg := sync.WaitGroup{}
+	ec := int32(0)
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+
+		go func() {
+			if e := d.AppendNode(&(&Foo{bar: i}).listNode, -1); e != nil {
+				if e != semaphore.SemaphoreClosedError {
+					t.Errorf("%#v != %#v", e, semaphore.SemaphoreClosedError)
+				}
+
+				atomic.AddInt32(&ec, 1)
+			}
+
+			wg.Done()
+		}()
+	}
+
+	time.Sleep(time.Second / 20)
+	d.Close()
+	wg.Wait()
+
+	if ec != 7 {
+		t.Errorf("%#v", ec)
+	}
 }

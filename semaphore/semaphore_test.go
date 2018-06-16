@@ -37,7 +37,7 @@ func TestDownAndUpSemaphore1(t *testing.T) {
 	s.Up(false, -1, nil)
 	s.Up(false, -1, nil)
 	time.Sleep(time.Second / 10)
-	s.Close(nil, nil)
+	s.Close(nil)
 	wg.Wait()
 
 	if sc != 52 {
