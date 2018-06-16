@@ -1,9 +1,8 @@
 package condition
 
 import (
-	"errors"
+	"context"
 	"sync"
-	"time"
 	"unsafe"
 
 	"github.com/let-z-go/intrusive_containers/list"
@@ -21,22 +20,22 @@ func (self *Condition) Initialize(lock sync.Locker) {
 	self.waiterList2.Initialize()
 }
 
-func (self *Condition) WaitFor(timeout time.Duration) error {
+func (self *Condition) WaitFor(context_ context.Context) error {
 	waiter := conditionWaiter{}
-	waiter.event = make(chan byte, 1)
+	waiter.event = make(chan struct{}, 1)
 	self.waiterList1.AppendNode(&waiter.listNode)
 	self.lock.Unlock()
 	var e error
 
-	if timeout < 0 {
+	if context_ == nil {
 		<-waiter.event
 		e = nil
 	} else {
 		select {
 		case <-waiter.event:
 			e = nil
-		case <-time.After(timeout):
-			e = ConditionTimedOutError
+		case <-context_.Done():
+			e = context_.Err()
 		}
 	}
 
@@ -51,7 +50,7 @@ func (self *Condition) Signal() {
 	}
 
 	waiter := (*conditionWaiter)(self.waiterList1.GetHead().GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
-	waiter.event <- 0
+	waiter.event <- struct{}{}
 	waiter.listNode.Remove()
 	self.waiterList2.AppendNode(&waiter.listNode)
 }
@@ -61,7 +60,7 @@ func (self *Condition) Broadcast() {
 
 	for listNode := getNode(); listNode != nil; listNode = getNode() {
 		waiter := (*conditionWaiter)(listNode.GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
-		waiter.event <- 0
+		waiter.event <- struct{}{}
 	}
 
 	self.waiterList1.Append(&self.waiterList2)
@@ -69,7 +68,5 @@ func (self *Condition) Broadcast() {
 
 type conditionWaiter struct {
 	listNode list.ListNode
-	event    chan byte
+	event    chan struct{}
 }
-
-var ConditionTimedOutError = errors.New("toolkit: condition timed out")

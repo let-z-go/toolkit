@@ -1,6 +1,7 @@
 package condition
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ func TestWaitAndSignalCondition1(t *testing.T) {
 
 	go func() {
 		m.Lock()
-		c.WaitFor(-1)
+		c.WaitFor(nil)
 		m.Unlock()
 		wg.Done()
 	}()
@@ -36,14 +37,14 @@ func TestWaitAndSignalCondition2(t *testing.T) {
 
 	go func() {
 		m.Lock()
-		c.WaitFor(-1)
+		c.WaitFor(nil)
 		m.Unlock()
 		wg.Done()
 	}()
 
 	go func() {
 		m.Lock()
-		c.WaitFor(-1)
+		c.WaitFor(nil)
 		m.Unlock()
 		wg.Done()
 	}()
@@ -64,10 +65,10 @@ func TestWaitAndSignalCondition3(t *testing.T) {
 
 	go func() {
 		m.Lock()
-		e := c.WaitFor(time.Second / 20)
+		ctx, _ := context.WithTimeout(context.Background(), time.Second/20)
 
-		if e != ConditionTimedOutError {
-			t.Errorf("%#v != %#v", e, ConditionTimedOutError)
+		if e := c.WaitFor(ctx); e != context.DeadlineExceeded {
+			t.Errorf("%#v != %#v", e, context.DeadlineExceeded)
 		}
 
 		m.Unlock()

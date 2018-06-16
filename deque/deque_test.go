@@ -22,11 +22,11 @@ func TestDeque1(t *testing.T) {
 	f := int32(0)
 
 	go func() {
-		d.AppendNode(&(&Foo{bar: 1}).listNode, -1)
+		d.AppendNode(nil, &(&Foo{bar: 1}).listNode)
 		atomic.AddInt32(&f, 1)
-		d.AppendNode(&(&Foo{bar: 2}).listNode, -1)
+		d.AppendNode(nil, &(&Foo{bar: 2}).listNode)
 		atomic.AddInt32(&f, 1)
-		d.AppendNode(&(&Foo{bar: 3}).listNode, -1)
+		d.AppendNode(nil, &(&Foo{bar: 3}).listNode)
 		atomic.AddInt32(&f, 1)
 	}()
 
@@ -44,19 +44,19 @@ func TestDeque1(t *testing.T) {
 	}
 
 	var ln *list.ListNode
-	ln, _ = d.RemoveHead(true, -1)
+	ln, _ = d.RemoveHead(nil, true)
 
 	if f := (*Foo)(ln.GetContainer(unsafe.Offsetof(Foo{}.listNode))); f.bar != 1 {
 		t.Errorf("%#v", f.bar)
 	}
 
-	ln, _ = d.RemoveHead(true, -1)
+	ln, _ = d.RemoveHead(nil, true)
 
 	if f := (*Foo)(ln.GetContainer(unsafe.Offsetof(Foo{}.listNode))); f.bar != 2 {
 		t.Errorf("%#v", f.bar)
 	}
 
-	ln, _ = d.RemoveHead(true, -1)
+	ln, _ = d.RemoveHead(nil, true)
 
 	if f := (*Foo)(ln.GetContainer(unsafe.Offsetof(Foo{}.listNode))); f.bar != 3 {
 		t.Errorf("%#v", f.bar)
@@ -74,7 +74,7 @@ func TestDeque2(t *testing.T) {
 		wg.Add(1)
 
 		go func() {
-			if e := d.AppendNode(&(&Foo{bar: i}).listNode, -1); e != nil {
+			if e := d.AppendNode(nil, &(&Foo{bar: i}).listNode); e != nil {
 				if e != semaphore.SemaphoreClosedError {
 					t.Errorf("%#v != %#v", e, semaphore.SemaphoreClosedError)
 				}

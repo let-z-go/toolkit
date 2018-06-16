@@ -1,11 +1,11 @@
 package semaphore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/let-z-go/toolkit/condition"
 )
@@ -34,20 +34,20 @@ func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) {
 	self.upCondition.Initialize(&self.lock)
 }
 
-func (self *Semaphore) Down(decreaseMaxValue bool, timeout time.Duration, callback func()) error {
-	return self.doDown(false, decreaseMaxValue, timeout, callback)
+func (self *Semaphore) Down(context_ context.Context, decreaseMaxValue bool, callback func()) error {
+	return self.doDown(context_, false, decreaseMaxValue, callback)
 }
 
-func (self *Semaphore) DownAll(decreaseMaxValue bool, timeout time.Duration, callback func()) error {
-	return self.doDown(true, decreaseMaxValue, timeout, callback)
+func (self *Semaphore) DownAll(context_ context.Context, decreaseMaxValue bool, callback func()) error {
+	return self.doDown(context_, true, decreaseMaxValue, callback)
 }
 
-func (self *Semaphore) Up(increaseMinValue bool, timeout time.Duration, callback func()) error {
-	return self.doUp(false, increaseMinValue, timeout, callback)
+func (self *Semaphore) Up(context_ context.Context, increaseMinValue bool, callback func()) error {
+	return self.doUp(context_, false, increaseMinValue, callback)
 }
 
-func (self *Semaphore) UpAll(increaseMinValue bool, timeout time.Duration, callback func()) error {
-	return self.doUp(true, increaseMinValue, timeout, callback)
+func (self *Semaphore) UpAll(context_ context.Context, increaseMinValue bool, callback func()) error {
+	return self.doUp(context_, true, increaseMinValue, callback)
 }
 
 func (self *Semaphore) IncreaseMaxValue(increment int32, callback func()) error {
@@ -121,7 +121,7 @@ func (self *Semaphore) IsClosed() bool {
 	return atomic.LoadInt32(&self.isClosed) != 0
 }
 
-func (self *Semaphore) doDown(all bool, decreaseMaxValue bool, timeout time.Duration, callback func()) error {
+func (self *Semaphore) doDown(context_ context.Context, all bool, decreaseMaxValue bool, callback func()) error {
 	if self.IsClosed() {
 		return SemaphoreClosedError
 	}
@@ -137,9 +137,9 @@ func (self *Semaphore) doDown(all bool, decreaseMaxValue bool, timeout time.Dura
 		self.downWaiterCountX2 += 2
 
 		for {
-			if e := self.downCondition.WaitFor(timeout); e == condition.ConditionTimedOutError {
+			if e := self.downCondition.WaitFor(context_); e != nil {
 				self.lock.Unlock()
-				return SemaphoreTimedOutError
+				return e
 			}
 
 			if self.IsClosed() {
@@ -185,7 +185,7 @@ func (self *Semaphore) doDown(all bool, decreaseMaxValue bool, timeout time.Dura
 	return nil
 }
 
-func (self *Semaphore) doUp(all bool, increaseMinValue bool, timeout time.Duration, callback func()) error {
+func (self *Semaphore) doUp(context_ context.Context, all bool, increaseMinValue bool, callback func()) error {
 	if self.IsClosed() {
 		return SemaphoreClosedError
 	}
@@ -201,9 +201,9 @@ func (self *Semaphore) doUp(all bool, increaseMinValue bool, timeout time.Durati
 		self.upWaiterCountX2 += 2
 
 		for {
-			if e := self.upCondition.WaitFor(timeout); e == condition.ConditionTimedOutError {
+			if e := self.upCondition.WaitFor(context_); e != nil {
 				self.lock.Unlock()
-				return SemaphoreTimedOutError
+				return e
 			}
 
 			if self.IsClosed() {
@@ -278,4 +278,3 @@ func (self invalidSemaphoreValueError) Error() string {
 }
 
 var SemaphoreClosedError = errors.New("toolkit: semaphore closed")
-var SemaphoreTimedOutError = errors.New("toolkit: semaphore timed out")

@@ -1,6 +1,7 @@
 package semaphore
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,7 +18,7 @@ func TestDownAndUpSemaphore1(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func(i int) {
-			e := s.Down(false, -1, nil)
+			e := s.Down(nil, false, nil)
 
 			if e == nil {
 				atomic.AddInt32(&sc, 1)
@@ -34,8 +35,8 @@ func TestDownAndUpSemaphore1(t *testing.T) {
 	}
 
 	time.Sleep(time.Second / 10)
-	s.Up(false, -1, nil)
-	s.Up(false, -1, nil)
+	s.Up(nil, false, nil)
+	s.Up(nil, false, nil)
 	time.Sleep(time.Second / 10)
 	s.Close(nil)
 	wg.Wait()
@@ -51,7 +52,7 @@ func TestDownAndUpSemaphore1(t *testing.T) {
 
 func TestDownAndUpSemaphore2(t *testing.T) {
 	s := Semaphore{}
-	s.Initialize(0, 100, 50)
+	s.Initialize(0, 50, 0)
 	wg := sync.WaitGroup{}
 	sc := int32(0)
 	fc := int32(0)
@@ -59,13 +60,13 @@ func TestDownAndUpSemaphore2(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func(i int) {
-			e := s.Down(false, time.Second/20, nil)
+			ctx, _ := context.WithTimeout(context.Background(), time.Second/20)
 
-			if e == nil {
+			if e := s.Up(ctx, false, nil); e == nil {
 				atomic.AddInt32(&sc, 1)
 			} else {
-				if e != SemaphoreTimedOutError {
-					t.Errorf("%#v != %#v", e, SemaphoreTimedOutError)
+				if e != context.DeadlineExceeded {
+					t.Errorf("%#v != %#v", e, context.DeadlineExceeded)
 				}
 
 				atomic.AddInt32(&fc, 1)
@@ -76,8 +77,8 @@ func TestDownAndUpSemaphore2(t *testing.T) {
 	}
 
 	time.Sleep(time.Second / 10)
-	s.Up(false, -1, nil)
-	s.Up(false, -1, nil)
+	s.Down(nil, false, nil)
+	s.Down(nil, false, nil)
 	time.Sleep(time.Second / 10)
 	wg.Wait()
 

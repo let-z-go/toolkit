@@ -1,7 +1,7 @@
 package deque
 
 import (
-	"time"
+	"context"
 
 	"github.com/let-z-go/intrusive_containers/list"
 	"github.com/let-z-go/toolkit/semaphore"
@@ -17,38 +17,38 @@ func (self *Deque) Initialize(maxNumberOfNodes int32) {
 	self.list.Initialize()
 }
 
-func (self *Deque) AppendNode(node *list.ListNode, timeout time.Duration) error {
-	return self.semaphore.Up(false, timeout, func() {
+func (self *Deque) AppendNode(context_ context.Context, node *list.ListNode) error {
+	return self.semaphore.Up(context_, false, func() {
 		self.list.AppendNode(node)
 	})
 }
 
-func (self *Deque) PrependNode(node *list.ListNode, timeout time.Duration) error {
-	return self.semaphore.Up(false, timeout, func() {
+func (self *Deque) PrependNode(context_ context.Context, node *list.ListNode) error {
+	return self.semaphore.Up(context_, false, func() {
 		self.list.PrependNode(node)
 	})
 }
 
-func (self *Deque) RemoveTail(commitNodeRemoval bool, timeout time.Duration) (*list.ListNode, error) {
+func (self *Deque) RemoveTail(context_ context.Context, commitNodeRemoval bool) (*list.ListNode, error) {
 	node := (*list.ListNode)(nil)
 
-	return node, self.semaphore.Down(!commitNodeRemoval, timeout, func() {
+	return node, self.semaphore.Down(context_, !commitNodeRemoval, func() {
 		node = self.list.GetTail()
 		node.Remove()
 	})
 }
 
-func (self *Deque) RemoveHead(commitNodeRemoval bool, timeout time.Duration) (*list.ListNode, error) {
+func (self *Deque) RemoveHead(context_ context.Context, commitNodeRemoval bool) (*list.ListNode, error) {
 	node := (*list.ListNode)(nil)
 
-	return node, self.semaphore.Down(!commitNodeRemoval, timeout, func() {
+	return node, self.semaphore.Down(context_, !commitNodeRemoval, func() {
 		node = self.list.GetHead()
 		node.Remove()
 	})
 }
 
-func (self *Deque) RemoveAllNodes(commitNodeRemovals bool, timeout time.Duration, nodeList *list.List) error {
-	return self.semaphore.DownAll(!commitNodeRemovals, timeout, func() {
+func (self *Deque) RemoveAllNodes(context_ context.Context, commitNodeRemovals bool, nodeList *list.List) error {
+	return self.semaphore.DownAll(context_, !commitNodeRemovals, func() {
 		self.list.Append(nodeList)
 	})
 }
