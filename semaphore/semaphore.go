@@ -24,7 +24,7 @@ type Semaphore struct {
 
 func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) {
 	if value < minValue || value > maxValue {
-		panic(fmt.Errorf("toolkit: invalid semaphore value: minValue=%#v, maxValue=%#v, value=%#v", minValue, maxValue, value))
+		panic(fmt.Errorf("toolkit: semaphore initialization: minValue=%#v, maxValue=%#v, value=%#v", minValue, maxValue, value))
 	}
 
 	self.minValue = minValue
