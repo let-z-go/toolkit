@@ -2,6 +2,7 @@ package condition
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"unsafe"
 
@@ -9,21 +10,30 @@ import (
 )
 
 type Condition struct {
-	lock        sync.Locker
-	waiterList1 list.List
-	waiterList2 list.List
+	lock           sync.Locker
+	listOfWaiters1 list.List
+	listOfWaiters2 list.List
 }
 
 func (self *Condition) Initialize(lock sync.Locker) {
+	if self.lock != nil {
+		panic(errors.New("toolkit: condition already initialized"))
+	}
+
+	if lock == nil {
+		panic(errors.New("toolkit: invalid lock"))
+	}
+
 	self.lock = lock
-	self.waiterList1.Initialize()
-	self.waiterList2.Initialize()
+	self.listOfWaiters1.Initialize()
+	self.listOfWaiters2.Initialize()
 }
 
 func (self *Condition) WaitFor(context_ context.Context) error {
-	waiter := conditionWaiter{}
+	self.checkUninitialized()
+	var waiter conditionWaiter
 	waiter.event = make(chan struct{}, 1)
-	self.waiterList1.AppendNode(&waiter.listNode)
+	self.listOfWaiters1.AppendNode(&waiter.listNode)
 	self.lock.Unlock()
 	var e error
 
@@ -45,25 +55,34 @@ func (self *Condition) WaitFor(context_ context.Context) error {
 }
 
 func (self *Condition) Signal() {
-	if self.waiterList1.IsEmpty() {
+	self.checkUninitialized()
+
+	if self.listOfWaiters1.IsEmpty() {
 		return
 	}
 
-	waiter := (*conditionWaiter)(self.waiterList1.GetHead().GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
+	waiter := (*conditionWaiter)(self.listOfWaiters1.GetHead().GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
 	waiter.event <- struct{}{}
 	waiter.listNode.Remove()
-	self.waiterList2.AppendNode(&waiter.listNode)
+	self.listOfWaiters2.AppendNode(&waiter.listNode)
 }
 
 func (self *Condition) Broadcast() {
-	getNode := self.waiterList1.GetNodes()
+	self.checkUninitialized()
+	getNode := self.listOfWaiters1.GetNodes()
 
 	for listNode := getNode(); listNode != nil; listNode = getNode() {
 		waiter := (*conditionWaiter)(listNode.GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
 		waiter.event <- struct{}{}
 	}
 
-	self.waiterList1.Append(&self.waiterList2)
+	self.listOfWaiters1.Append(&self.listOfWaiters2)
+}
+
+func (self *Condition) checkUninitialized() {
+	if self.lock == nil {
+		panic(errors.New("toolkit: condition uninitialized"))
+	}
 }
 
 type conditionWaiter struct {

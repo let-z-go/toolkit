@@ -9,9 +9,9 @@ import (
 )
 
 func TestDownAndUpSemaphore1(t *testing.T) {
-	s := Semaphore{}
+	var s Semaphore
 	s.Initialize(0, 100, 50)
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	sc := int32(0)
 	fc := int32(0)
 
@@ -51,9 +51,9 @@ func TestDownAndUpSemaphore1(t *testing.T) {
 }
 
 func TestDownAndUpSemaphore2(t *testing.T) {
-	s := Semaphore{}
+	var s Semaphore
 	s.Initialize(0, 50, 0)
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	sc := int32(0)
 	fc := int32(0)
 

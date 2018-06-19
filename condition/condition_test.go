@@ -8,10 +8,10 @@ import (
 )
 
 func TestWaitAndSignalCondition1(t *testing.T) {
-	m := sync.Mutex{}
-	c := Condition{}
+	var m sync.Mutex
+	var c Condition
 	c.Initialize(&m)
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
@@ -29,10 +29,10 @@ func TestWaitAndSignalCondition1(t *testing.T) {
 }
 
 func TestWaitAndSignalCondition2(t *testing.T) {
-	m := sync.Mutex{}
-	c := Condition{}
+	var m sync.Mutex
+	var c Condition
 	c.Initialize(&m)
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	wg.Add(2)
 
 	go func() {
@@ -57,10 +57,10 @@ func TestWaitAndSignalCondition2(t *testing.T) {
 }
 
 func TestWaitAndSignalCondition3(t *testing.T) {
-	m := sync.Mutex{}
-	c := Condition{}
+	var m sync.Mutex
+	var c Condition
 	c.Initialize(&m)
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {

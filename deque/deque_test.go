@@ -17,7 +17,7 @@ type Foo struct {
 }
 
 func TestDeque1(t *testing.T) {
-	d := Deque{}
+	var d Deque
 	d.Initialize(2)
 	f := int32(0)
 
@@ -65,9 +65,9 @@ func TestDeque1(t *testing.T) {
 }
 
 func TestDeque2(t *testing.T) {
-	d := Deque{}
+	var d Deque
 	d.Initialize(3)
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	ec := int32(0)
 
 	for i := 0; i < 10; i++ {
@@ -87,7 +87,7 @@ func TestDeque2(t *testing.T) {
 	}
 
 	time.Sleep(time.Second / 20)
-	d.Close()
+	d.Close(nil)
 	wg.Wait()
 
 	if ec != 7 {

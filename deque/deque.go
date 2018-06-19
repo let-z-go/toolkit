@@ -47,18 +47,30 @@ func (self *Deque) RemoveHead(context_ context.Context, commitNodeRemoval bool) 
 	})
 }
 
-func (self *Deque) RemoveAllNodes(context_ context.Context, commitNodeRemovals bool, nodeList *list.List) error {
+func (self *Deque) RemoveAllNodes(context_ context.Context, commitNodeRemovals bool, list_ *list.List) (int32, error) {
 	return self.semaphore.DownAll(context_, !commitNodeRemovals, func() {
-		self.list.Append(nodeList)
+		self.list.Append(list_)
 	})
 }
 
-func (self *Deque) CommitNodeRemovals(numberOfNodeRemovals int32) error {
-	return self.semaphore.IncreaseMaxValue(numberOfNodeRemovals, nil)
+func (self *Deque) CommitNodeRemovals(numberOfNodes int32) error {
+	return self.semaphore.IncreaseMaxValue(numberOfNodes, false, nil)
 }
 
-func (self *Deque) Close() error {
+func (self *Deque) DiscardNodeRemovals(list_ *list.List, numberOfNodes int32) error {
+	return self.semaphore.IncreaseMaxValue(numberOfNodes, true, func() {
+		list_.Prepend(&self.list)
+	})
+}
+
+func (self *Deque) Close(list_ *list.List) error {
 	return self.semaphore.Close(func() {
-		self.list.Initialize()
+		if list_ != nil {
+			self.list.Append(list_)
+		}
 	})
+}
+
+func (self *Deque) IsClosed() bool {
+	return self.semaphore.IsClosed()
 }
