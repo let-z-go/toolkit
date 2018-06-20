@@ -1,5 +1,9 @@
 package byte_stream
 
+import (
+	"github.com/let-z-go/toolkit/utils"
+)
+
 type ByteStream struct {
 	base         []byte
 	dataOffset   int
@@ -7,17 +11,16 @@ type ByteStream struct {
 }
 
 func (self *ByteStream) Read(buffer []byte) int {
-	copy(buffer, self.GetData())
-	return self.DiscardData(len(buffer))
+	numberOfBytes := copy(buffer, self.GetData())
+	self.DiscardData(numberOfBytes)
+	return numberOfBytes
 }
 
 func (self *ByteStream) DiscardData(dataSize int) int {
+	dataSize = int(utils.MaxOfZero(int64(dataSize)))
+
 	if maxDataSize := self.GetDataSize(); dataSize > maxDataSize {
 		dataSize = maxDataSize
-	}
-
-	if dataSize < 1 {
-		return 0
 	}
 
 	self.dataOffset += dataSize
@@ -38,18 +41,16 @@ func (self *ByteStream) Write(data []byte) {
 }
 
 func (self *ByteStream) ReserveBuffer(bufferSize int) {
-	if bufferSize < self.GetBufferSize() {
-		return
-	}
+	bufferSize = int(utils.MaxOfZero(int64(bufferSize)))
 
-	if bufferSize < 1 {
+	if bufferSize < self.GetBufferSize() {
 		return
 	}
 
 	data := self.GetData()
 
 	if bufferSize > len(self.base)-len(data) || 2*len(data) > len(self.base) {
-		newBaseSize := int(nextPowerOfTwo(int64(self.bufferOffset + bufferSize)))
+		newBaseSize := int(utils.NextPowerOfTwo(int64(self.bufferOffset + bufferSize)))
 		self.base = make([]byte, newBaseSize)
 	}
 
@@ -59,12 +60,10 @@ func (self *ByteStream) ReserveBuffer(bufferSize int) {
 }
 
 func (self *ByteStream) CommitBuffer(bufferSize int) int {
+	bufferSize = int(utils.MaxOfZero(int64(bufferSize)))
+
 	if maxBufferSize := self.GetBufferSize(); bufferSize > maxBufferSize {
 		bufferSize = maxBufferSize
-	}
-
-	if bufferSize < 1 {
-		return 0
 	}
 
 	self.bufferOffset += bufferSize
@@ -86,16 +85,4 @@ func (self *ByteStream) GetBuffer() []byte {
 
 func (self *ByteStream) GetBufferSize() int {
 	return len(self.base) - self.bufferOffset
-}
-
-func nextPowerOfTwo(number int64) int64 {
-	number--
-	number |= number >> 1
-	number |= number >> 2
-	number |= number >> 4
-	number |= number >> 8
-	number |= number >> 16
-	number |= number >> 32
-	number++
-	return number
 }
