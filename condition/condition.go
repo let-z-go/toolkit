@@ -17,7 +17,7 @@ type Condition struct {
 
 func (self *Condition) Initialize(lock sync.Locker) {
 	if self.lock != nil {
-		panic(errors.New("toolkit: condition initialization"))
+		panic(errors.New("toolkit: condition already initialized"))
 	}
 
 	self.lock = lock
