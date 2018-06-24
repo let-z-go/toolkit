@@ -65,12 +65,13 @@ func TestWaitAndSignalCondition3(t *testing.T) {
 
 	go func() {
 		m.Lock()
-		ctx, _ := context.WithTimeout(context.Background(), time.Second/20)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second/20)
 
 		if e := c.WaitFor(ctx); e != context.DeadlineExceeded {
 			t.Errorf("%#v != %#v", e, context.DeadlineExceeded)
 		}
 
+		cancel()
 		m.Unlock()
 		wg.Done()
 	}()

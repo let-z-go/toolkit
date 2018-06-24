@@ -19,10 +19,14 @@ type Semaphore struct {
 	upWaiterCountX2   uint32
 	downCondition     condition.Condition
 	upCondition       condition.Condition
-	isOpen            int32
+	openness          int32
 }
 
 func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) {
+	if self.openness != 0 {
+		panic(errors.New("toolkit: semaphore already initialized"))
+	}
+
 	if value < minValue || value > maxValue {
 		panic(fmt.Errorf("toolkit: semaphore initialization: minValue=%#v, maxValue=%#v, value=%#v", minValue, maxValue, value))
 	}
@@ -32,7 +36,24 @@ func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) {
 	self.value = value
 	self.downCondition.Initialize(&self.lock)
 	self.upCondition.Initialize(&self.lock)
-	self.isOpen = -1
+	self.openness = 1
+}
+
+func (self *Semaphore) Close(callback func()) error {
+	if !atomic.CompareAndSwapInt32(&self.openness, 1, -1) {
+		return SemaphoreClosedError
+	}
+
+	self.lock.Lock()
+
+	if callback != nil {
+		callback()
+	}
+
+	self.upCondition.Broadcast()
+	self.downCondition.Broadcast()
+	self.lock.Unlock()
+	return nil
 }
 
 func (self *Semaphore) Down(context_ context.Context, decreaseMaxValue bool, callback func()) error {
@@ -113,25 +134,8 @@ func (self *Semaphore) DecreaseMinValue(decrement int32, decreaseValue bool, cal
 	return nil
 }
 
-func (self *Semaphore) Close(callback func()) error {
-	if !atomic.CompareAndSwapInt32(&self.isOpen, -1, 0) {
-		return SemaphoreClosedError
-	}
-
-	self.lock.Lock()
-
-	if callback != nil {
-		callback()
-	}
-
-	self.upCondition.Broadcast()
-	self.downCondition.Broadcast()
-	self.lock.Unlock()
-	return nil
-}
-
 func (self *Semaphore) IsClosed() bool {
-	return atomic.LoadInt32(&self.isOpen) == 0
+	return atomic.LoadInt32(&self.openness) != 1
 }
 
 func (self *Semaphore) doDown(context_ context.Context, maximizeDecrement bool, decreaseMaxValue bool, callback func()) (int32, error) {

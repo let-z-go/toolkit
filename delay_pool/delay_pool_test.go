@@ -12,9 +12,9 @@ func TestAllocateDelayPoolItem(t *testing.T) {
 	st := time.Now()
 
 	for i := 0; i < 6; i++ {
-		v, ok := dp.GetValue()
+		v, e := dp.GetValue(nil)
 
-		if !ok {
+		if e == NoMoreValuesError {
 			break
 		}
 
@@ -31,9 +31,9 @@ func TestAllocateDelayPoolItem(t *testing.T) {
 		t.Errorf("%#v", d)
 	}
 
-	_, ok := dp.GetValue()
+	_, e := dp.GetValue(nil)
 
-	if ok {
-		t.Error()
+	if e != NoMoreValuesError {
+		t.Errorf("%v", e)
 	}
 }

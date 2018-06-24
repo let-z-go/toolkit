@@ -60,7 +60,7 @@ func TestDownAndUpSemaphore2(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func(i int) {
-			ctx, _ := context.WithTimeout(context.Background(), time.Second/20)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second/20)
 
 			if e := s.Up(ctx, false, nil); e == nil {
 				atomic.AddInt32(&sc, 1)
@@ -72,6 +72,7 @@ func TestDownAndUpSemaphore2(t *testing.T) {
 				atomic.AddInt32(&fc, 1)
 			}
 
+			cancel()
 			wg.Done()
 		}(i)
 	}

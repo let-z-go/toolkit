@@ -17,6 +17,16 @@ func (self *Deque) Initialize(maxNumberOfNodes int32) {
 	self.list.Initialize()
 }
 
+func (self *Deque) Close(list_ *list.List) error {
+	return self.semaphore.Close(func() {
+		if list_ == nil {
+			self.list.Initialize()
+		} else {
+			self.list.Append(list_)
+		}
+	})
+}
+
 func (self *Deque) AppendNode(context_ context.Context, node *list.ListNode) error {
 	return self.semaphore.Up(context_, false, func() {
 		self.list.AppendNode(node)
@@ -60,14 +70,6 @@ func (self *Deque) CommitNodeRemovals(numberOfNodes int32) error {
 func (self *Deque) DiscardNodeRemovals(list_ *list.List, numberOfNodes int32) error {
 	return self.semaphore.IncreaseMaxValue(numberOfNodes, true, func() {
 		list_.Prepend(&self.list)
-	})
-}
-
-func (self *Deque) Close(list_ *list.List) error {
-	return self.semaphore.Close(func() {
-		if list_ != nil {
-			self.list.Append(list_)
-		}
 	})
 }
 

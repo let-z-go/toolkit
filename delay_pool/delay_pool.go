@@ -1,21 +1,23 @@
 package delay_pool
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
 )
 
 type DelayPool struct {
-	values             []interface{}
-	numberOfItems      int
-	maxDelay           time.Duration
-	usedItemCount      int
-	nextItemUsableTime time.Time
+	values              []interface{}
+	numberOfValues      int
+	maxDelay            time.Duration
+	usedValueCount      int
+	nextValueUsableTime time.Time
 }
 
-func (self *DelayPool) Reset(values []interface{}, numberOfItems int, maxTotalDelay time.Duration) {
-	if len(values) == 0 {
+func (self *DelayPool) Reset(values []interface{}, numberOfValues int, maxTotalDelay time.Duration) {
+	if values == nil {
 		values = self.values
 	}
 
@@ -23,64 +25,92 @@ func (self *DelayPool) Reset(values []interface{}, numberOfItems int, maxTotalDe
 		panic(fmt.Errorf("toolkit: delay pool reset: values=%#v", values))
 	}
 
-	if numberOfItems < 1 {
-		numberOfItems = self.numberOfItems
+	if numberOfValues < 1 {
+		numberOfValues = self.numberOfValues
 	}
 
-	if numberOfItems < 1 {
-		panic(fmt.Errorf("toolkit: delay pool reset: numberOfItems=%#v", numberOfItems))
+	if numberOfValues < 1 {
+		panic(fmt.Errorf("toolkit: delay pool reset: numberOfValues=%#v", numberOfValues))
 	}
 
 	if maxTotalDelay < 1 {
-		maxTotalDelay = time.Duration(self.numberOfItems) * self.maxDelay
+		maxTotalDelay = time.Duration(self.numberOfValues) * self.maxDelay
 	}
 
 	if maxTotalDelay < 1 {
 		panic(fmt.Errorf("toolkit: delay pool reset: maxTotalDelay=%#v", maxTotalDelay))
 	}
 
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+
 	for i := int32(len(values)) - 1; i >= 1; i-- {
-		j := rand.Int31n(i + 1)
+		j := random.Int31n(i + 1)
 		values[i], values[j] = values[j], values[i]
 	}
 
 	self.values = values
-	self.numberOfItems = numberOfItems
-	self.maxDelay = maxTotalDelay / time.Duration(numberOfItems)
-	self.usedItemCount = 0
+	self.numberOfValues = numberOfValues
+	self.maxDelay = maxTotalDelay / time.Duration(numberOfValues)
+	self.usedValueCount = 0
 }
 
-func (self *DelayPool) GetValue() (interface{}, bool) {
-	if self.usedItemCount == self.numberOfItems {
-		if !self.nextItemUsableTime.IsZero() {
-			delay := self.nextItemUsableTime.Sub(time.Now())
+func (self *DelayPool) Collect() {
+	self.values = nil
+}
+
+func (self *DelayPool) GetValue(context_ context.Context) (interface{}, error) {
+	if self.usedValueCount == self.numberOfValues {
+		if !self.nextValueUsableTime.IsZero() {
+			delay := self.nextValueUsableTime.Sub(time.Now())
 
 			if delay >= time.Millisecond {
-				time.Sleep(delay)
+				if context_ == nil {
+					time.Sleep(delay)
+				} else {
+					select {
+					case <-time.After(delay):
+					case <-context_.Done():
+						return nil, context_.Err()
+					}
+				}
 			}
 
-			self.nextItemUsableTime = time.Time{}
+			self.nextValueUsableTime = time.Time{}
 		}
 
-		return nil, false
+		return nil, NoMoreValuesError
 	}
 
 	var delay time.Duration
 
-	if self.usedItemCount == 0 {
-		self.nextItemUsableTime = time.Now()
+	if self.usedValueCount == 0 {
+		self.nextValueUsableTime = time.Now()
 		delay = time.Duration(0)
 	} else {
-		delay = self.nextItemUsableTime.Sub(time.Now())
+		delay = self.nextValueUsableTime.Sub(time.Now())
 	}
 
-	value := self.values[self.usedItemCount%len(self.values)]
-	self.usedItemCount += 1
-	self.nextItemUsableTime = self.nextItemUsableTime.Add(self.maxDelay)
+	value := self.values[self.usedValueCount%len(self.values)]
+	self.usedValueCount += 1
+	self.nextValueUsableTime = self.nextValueUsableTime.Add(self.maxDelay)
 
 	if delay >= time.Millisecond {
-		time.Sleep(delay)
+		if context_ == nil {
+			time.Sleep(delay)
+		} else {
+			select {
+			case <-time.After(delay):
+			case <-context_.Done():
+				return nil, context_.Err()
+			}
+		}
 	}
 
-	return value, true
+	return value, nil
 }
+
+func (self *DelayPool) WhenNextValueUsable() time.Time {
+	return self.nextValueUsableTime
+}
+
+var NoMoreValuesError = errors.New("toolkit: no more values")

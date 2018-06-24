@@ -10,6 +10,10 @@ type ByteStream struct {
 	bufferOffset int
 }
 
+func (self *ByteStream) Collect() {
+	self.base = nil
+}
+
 func (self *ByteStream) Read(buffer []byte) int {
 	dataSize := copy(buffer, self.GetData())
 	self.doDiscardData(dataSize)
