@@ -91,3 +91,87 @@ func TestDownAndUpSemaphore2(t *testing.T) {
 		t.Errorf("%#v", fc)
 	}
 }
+
+func TestDownAndUpSemaphore3(t *testing.T) {
+	{
+		var s Semaphore
+		s.Initialize(0, 10, 10)
+
+		go func() {
+			time.Sleep(time.Second / 10)
+			s.DownAll(nil, false, nil)
+		}()
+
+		s.Up(nil, false, nil)
+	}
+
+	{
+		var s Semaphore
+		s.Initialize(0, 10, 0)
+
+		go func() {
+			time.Sleep(time.Second / 10)
+			s.UpAll(nil, false, nil)
+		}()
+
+		s.Down(nil, false, nil)
+	}
+}
+
+func TestDownAndUpSemaphore4(t *testing.T) {
+	{
+		var s Semaphore
+		s.Initialize(0, 10, 10)
+
+		go func() {
+			time.Sleep(time.Second / 10)
+			s.DecreaseMinValue(1, true, nil)
+		}()
+
+		s.Up(nil, false, nil)
+	}
+
+	{
+		var s Semaphore
+		s.Initialize(0, 10, 0)
+
+		go func() {
+			time.Sleep(time.Second / 10)
+			s.IncreaseMaxValue(1, true, nil)
+		}()
+
+		s.Down(nil, false, nil)
+	}
+}
+
+func TestDownAndUpSemaphore5(t *testing.T) {
+	{
+		var s Semaphore
+		s.Initialize(0, 10, 10)
+
+		go func() {
+			time.Sleep(time.Second / 10)
+			s.Down(nil, false, nil)
+			s.Up(nil, false, nil)
+			time.Sleep(time.Second / 10)
+			s.Down(nil, false, nil)
+		}()
+
+		s.Up(nil, false, nil)
+	}
+
+	{
+		var s Semaphore
+		s.Initialize(0, 10, 10)
+
+		go func() {
+			time.Sleep(time.Second / 10)
+			s.Up(nil, false, nil)
+			s.Down(nil, false, nil)
+			time.Sleep(time.Second / 10)
+			s.Up(nil, false, nil)
+		}()
+
+		s.Down(nil, false, nil)
+	}
+}

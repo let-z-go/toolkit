@@ -89,13 +89,16 @@ func (self *Semaphore) IncreaseMaxValue(increment int32, increaseValue bool, cal
 		callback()
 	}
 
-	maxValue := self.maxValue
 	self.maxValue += increment
 
 	if increaseValue {
 		self.value += increment
+
+		if self.value-increment == self.minValue {
+			self.notifyDownWaiter()
+		}
 	} else {
-		if self.value == maxValue {
+		if self.value == self.maxValue-increment {
 			self.notifyUpWaiter()
 		}
 	}
@@ -119,13 +122,16 @@ func (self *Semaphore) DecreaseMinValue(decrement int32, decreaseValue bool, cal
 		callback()
 	}
 
-	minValue := self.minValue
 	self.minValue -= decrement
 
 	if decreaseValue {
 		self.value -= decrement
+
+		if self.value+decrement == self.maxValue {
+			self.notifyUpWaiter()
+		}
 	} else {
-		if self.value == minValue {
+		if self.value == self.minValue+decrement {
 			self.notifyDownWaiter()
 		}
 	}
@@ -164,12 +170,14 @@ func (self *Semaphore) doDown(context_ context.Context, maximizeDecrement bool, 
 				return 0, SemaphoreClosedError
 			}
 
+			self.downWaiterCountX2 &^= 1
+
 			if self.value > self.minValue {
 				break
 			}
 		}
 
-		self.downWaiterCountX2 = (self.downWaiterCountX2 - 2) &^ 1
+		self.downWaiterCountX2 -= 2
 	}
 
 	if callback != nil {
@@ -180,20 +188,20 @@ func (self *Semaphore) doDown(context_ context.Context, maximizeDecrement bool, 
 
 	if maximizeDecrement {
 		decrement = self.value - self.minValue
+		self.value = self.minValue
 	} else {
 		decrement = 1
-	}
+		self.value--
 
-	self.value -= decrement
-
-	if self.value > self.minValue {
-		self.notifyDownWaiter()
+		if self.value > self.minValue {
+			self.notifyDownWaiter()
+		}
 	}
 
 	if decreaseMaxValue {
 		self.maxValue -= decrement
 	} else {
-		if self.value == self.maxValue-1 {
+		if self.value+decrement == self.maxValue {
 			self.notifyUpWaiter()
 		}
 	}
@@ -228,12 +236,14 @@ func (self *Semaphore) doUp(context_ context.Context, maximizeIncrement bool, in
 				return 0, SemaphoreClosedError
 			}
 
+			self.upWaiterCountX2 &^= 1
+
 			if self.value < self.maxValue {
 				break
 			}
 		}
 
-		self.upWaiterCountX2 = (self.upWaiterCountX2 - 2) &^ 1
+		self.upWaiterCountX2 -= 2
 	}
 
 	if callback != nil {
@@ -244,20 +254,20 @@ func (self *Semaphore) doUp(context_ context.Context, maximizeIncrement bool, in
 
 	if maximizeIncrement {
 		increment = self.maxValue - self.value
+		self.value = self.maxValue
 	} else {
 		increment = 1
-	}
+		self.value++
 
-	self.value += increment
-
-	if self.value < self.maxValue {
-		self.notifyUpWaiter()
+		if self.value < self.maxValue {
+			self.notifyUpWaiter()
+		}
 	}
 
 	if increaseMinValue {
 		self.minValue += increment
 	} else {
-		if self.value == self.minValue+1 {
+		if self.value-increment == self.minValue {
 			self.notifyDownWaiter()
 		}
 	}
