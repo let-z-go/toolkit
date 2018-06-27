@@ -156,7 +156,7 @@ func (self *Semaphore) doDown(context_ context.Context, maximizeDecrement bool, 
 		return 0, SemaphoreClosedError
 	}
 
-	if self.value == self.minValue {
+	if self.value == self.minValue || self.downWaiterCountX2 >= 2 {
 		self.downWaiterCountX2 += 2
 
 		for {
@@ -222,7 +222,7 @@ func (self *Semaphore) doUp(context_ context.Context, maximizeIncrement bool, in
 		return 0, SemaphoreClosedError
 	}
 
-	if self.value == self.maxValue {
+	if self.value == self.maxValue || self.upWaiterCountX2 >= 2 {
 		self.upWaiterCountX2 += 2
 
 		for {
