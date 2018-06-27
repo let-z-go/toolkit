@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"math"
 	"testing"
 )
 
@@ -18,6 +19,10 @@ func TestMaxOfZero(t *testing.T) {
 	}
 
 	if x := MaxOfZero(100); x != 100 {
+		t.Errorf("%#v", x)
+	}
+
+	if x := MaxOfZero(math.MaxInt64); x != math.MaxInt64 {
 		t.Errorf("%#v", x)
 	}
 }
