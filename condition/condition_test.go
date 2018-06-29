@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestWaitAndSignalCondition1(t *testing.T) {
+func TestCondition1(t *testing.T) {
 	var m sync.Mutex
 	var c Condition
 	c.Initialize(&m)
@@ -16,7 +16,11 @@ func TestWaitAndSignalCondition1(t *testing.T) {
 
 	go func() {
 		m.Lock()
-		c.WaitFor(nil)
+
+		if ok, _ := c.WaitFor(nil); !ok {
+			t.Error()
+		}
+
 		m.Unlock()
 		wg.Done()
 	}()
@@ -28,7 +32,7 @@ func TestWaitAndSignalCondition1(t *testing.T) {
 	wg.Wait()
 }
 
-func TestWaitAndSignalCondition2(t *testing.T) {
+func TestCondition2(t *testing.T) {
 	var m sync.Mutex
 	var c Condition
 	c.Initialize(&m)
@@ -37,14 +41,22 @@ func TestWaitAndSignalCondition2(t *testing.T) {
 
 	go func() {
 		m.Lock()
-		c.WaitFor(nil)
+
+		if ok, _ := c.WaitFor(nil); !ok {
+			t.Error()
+		}
+
 		m.Unlock()
 		wg.Done()
 	}()
 
 	go func() {
 		m.Lock()
-		c.WaitFor(nil)
+
+		if ok, _ := c.WaitFor(nil); !ok {
+			t.Error()
+		}
+
 		m.Unlock()
 		wg.Done()
 	}()
@@ -56,7 +68,7 @@ func TestWaitAndSignalCondition2(t *testing.T) {
 	wg.Wait()
 }
 
-func TestWaitAndSignalCondition3(t *testing.T) {
+func TestCondition3(t *testing.T) {
 	var m sync.Mutex
 	var c Condition
 	c.Initialize(&m)
@@ -67,7 +79,7 @@ func TestWaitAndSignalCondition3(t *testing.T) {
 		m.Lock()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second/20)
 
-		if e := c.WaitFor(ctx); e != context.DeadlineExceeded {
+		if _, e := c.WaitFor(ctx); e != context.DeadlineExceeded {
 			t.Errorf("%#v != %#v", e, context.DeadlineExceeded)
 		}
 

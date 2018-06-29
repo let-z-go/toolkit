@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestDownAndUpSemaphore1(t *testing.T) {
+func TestSemaphore1(t *testing.T) {
 	var s Semaphore
 	s.Initialize(0, 100, 50)
 	var wg sync.WaitGroup
@@ -50,7 +50,7 @@ func TestDownAndUpSemaphore1(t *testing.T) {
 	}
 }
 
-func TestDownAndUpSemaphore2(t *testing.T) {
+func TestSemaphore2(t *testing.T) {
 	var s Semaphore
 	s.Initialize(0, 50, 0)
 	var wg sync.WaitGroup
@@ -92,7 +92,7 @@ func TestDownAndUpSemaphore2(t *testing.T) {
 	}
 }
 
-func TestDownAndUpSemaphore3(t *testing.T) {
+func TestSemaphore3(t *testing.T) {
 	{
 		var s Semaphore
 		s.Initialize(0, 10, 10)
@@ -118,7 +118,7 @@ func TestDownAndUpSemaphore3(t *testing.T) {
 	}
 }
 
-func TestDownAndUpSemaphore4(t *testing.T) {
+func TestSemaphore4(t *testing.T) {
 	{
 		var s Semaphore
 		s.Initialize(0, 10, 10)
@@ -144,7 +144,7 @@ func TestDownAndUpSemaphore4(t *testing.T) {
 	}
 }
 
-func TestDownAndUpSemaphore5(t *testing.T) {
+func TestSemaphore5(t *testing.T) {
 	{
 		var s Semaphore
 		s.Initialize(0, 10, 10)
@@ -173,5 +173,37 @@ func TestDownAndUpSemaphore5(t *testing.T) {
 		}()
 
 		s.Down(nil, false, nil)
+	}
+}
+
+func TestSemaphore6(t *testing.T) {
+	{
+		var s Semaphore
+		s.Initialize(0, 10, 10)
+		ctx, cancel := context.WithCancel(context.Background())
+
+		go func() {
+			time.Sleep(time.Second / 10)
+			cancel()
+			s.Down(nil, false, nil)
+		}()
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			go func() {
+				s.Up(nil, false, nil)
+				wg.Done()
+			}()
+
+			if e := s.Up(ctx, false, nil); e == nil {
+				s.Down(nil, false, nil)
+			}
+
+			wg.Done()
+		}()
+
+		wg.Wait()
 	}
 }

@@ -10,9 +10,8 @@ import (
 )
 
 type Condition struct {
-	lock           sync.Locker
-	listOfWaiters1 list.List
-	listOfWaiters2 list.List
+	lock          sync.Locker
+	listOfWaiters list.List
 }
 
 func (self *Condition) Initialize(lock sync.Locker) {
@@ -21,15 +20,14 @@ func (self *Condition) Initialize(lock sync.Locker) {
 	}
 
 	self.lock = lock
-	self.listOfWaiters1.Initialize()
-	self.listOfWaiters2.Initialize()
+	self.listOfWaiters.Initialize()
 }
 
-func (self *Condition) WaitFor(context_ context.Context) error {
+func (self *Condition) WaitFor(context_ context.Context) (bool, error) {
 	self.checkUninitialized()
 	var waiter conditionWaiter
 	waiter.event = make(chan struct{}, 1)
-	self.listOfWaiters1.AppendNode(&waiter.listNode)
+	self.listOfWaiters.AppendNode(&waiter.listNode)
 	self.lock.Unlock()
 	var e error
 
@@ -46,33 +44,39 @@ func (self *Condition) WaitFor(context_ context.Context) error {
 	}
 
 	self.lock.Lock()
-	waiter.listNode.Remove()
-	return e
+	ok := e == nil || waiter.listNode.IsReset()
+
+	if !ok {
+		waiter.listNode.Remove()
+	}
+
+	return ok, e
 }
 
 func (self *Condition) Signal() {
 	self.checkUninitialized()
 
-	if self.listOfWaiters1.IsEmpty() {
+	if self.listOfWaiters.IsEmpty() {
 		return
 	}
 
-	waiter := (*conditionWaiter)(self.listOfWaiters1.GetHead().GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
-	waiter.event <- struct{}{}
+	waiter := (*conditionWaiter)(self.listOfWaiters.GetHead().GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
 	waiter.listNode.Remove()
-	self.listOfWaiters2.AppendNode(&waiter.listNode)
+	waiter.listNode.Reset()
+	waiter.event <- struct{}{}
 }
 
 func (self *Condition) Broadcast() {
 	self.checkUninitialized()
-	getNode := self.listOfWaiters1.GetNodes()
+	getNode := self.listOfWaiters.GetNodes()
 
-	for listNode := getNode(); listNode != nil; listNode = getNode() {
+	for listNode, nextListNode := getNode(), getNode(); listNode != nil; listNode, nextListNode = nextListNode, getNode() {
+		listNode.Reset()
 		waiter := (*conditionWaiter)(listNode.GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
 		waiter.event <- struct{}{}
 	}
 
-	self.listOfWaiters1.Append(&self.listOfWaiters2)
+	self.listOfWaiters.Initialize()
 }
 
 func (self *Condition) checkUninitialized() {
