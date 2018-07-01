@@ -59,7 +59,7 @@ func TestReadWriteByteStream2(t *testing.T) {
 	var bs ByteStream
 	bs.ReserveBuffer(10)
 	bs.Write([]byte("0123456789"))
-	bs.DiscardData(3)
+	bs.Skip(3)
 
 	if bufsz := bs.GetBufferSize(); bufsz != 6 {
 		t.Errorf("%#v", bufsz)
@@ -82,7 +82,7 @@ func TestReadWriteByteStream3(t *testing.T) {
 	var bs ByteStream
 	bs.ReserveBuffer(10)
 	bs.Write([]byte("0123456789"))
-	bs.DiscardData(3)
+	bs.Skip(3)
 	bs.ReserveBuffer(10)
 
 	if bufsz := bs.GetBufferSize(); bufsz != 25 {

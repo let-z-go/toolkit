@@ -16,18 +16,18 @@ func (self *ByteStream) Collect() {
 
 func (self *ByteStream) Read(buffer []byte) int {
 	dataSize := copy(buffer, self.GetData())
-	self.doDiscardData(dataSize)
+	self.doSkip(dataSize)
 	return dataSize
 }
 
-func (self *ByteStream) DiscardData(dataSize int) int {
+func (self *ByteStream) Skip(dataSize int) int {
 	dataSize = int(utils.MaxOfZero(int64(dataSize)))
 
 	if maxDataSize := self.GetDataSize(); dataSize > maxDataSize {
 		dataSize = maxDataSize
 	}
 
-	self.doDiscardData(dataSize)
+	self.doSkip(dataSize)
 	return dataSize
 }
 
@@ -35,6 +35,36 @@ func (self *ByteStream) Write(data []byte) {
 	self.ReserveBuffer(len(data))
 	copy(self.GetBuffer(), data)
 	self.doCommitBuffer(len(data))
+}
+
+func (self *ByteStream) WriteDirectly(bufferSize int, callback func([]byte) error) error {
+	bufferSize = int(utils.MaxOfZero(int64(bufferSize)))
+	self.ReserveBuffer(bufferSize)
+
+	if e := callback(self.GetBuffer()); e != nil {
+		return e
+	}
+
+	self.doCommitBuffer(bufferSize)
+	return nil
+}
+
+func (self *ByteStream) Unwrite(dataSize int) int {
+	dataSize = int(utils.MaxOfZero(int64(dataSize)))
+
+	if maxDataSize := self.GetDataSize(); dataSize > maxDataSize {
+		dataSize = maxDataSize
+	}
+
+	self.bufferOffset -= dataSize
+
+	if self.bufferOffset < 2*self.dataOffset {
+		copy(self.base, self.GetData())
+		self.bufferOffset -= self.dataOffset
+		self.dataOffset = 0
+	}
+
+	return dataSize
 }
 
 func (self *ByteStream) ReserveBuffer(bufferSize int) {
@@ -84,7 +114,7 @@ func (self *ByteStream) GetBufferSize() int {
 	return len(self.base) - self.bufferOffset
 }
 
-func (self *ByteStream) doDiscardData(dataSize int) {
+func (self *ByteStream) doSkip(dataSize int) {
 	self.dataOffset += dataSize
 
 	if 2*self.dataOffset > self.bufferOffset {
