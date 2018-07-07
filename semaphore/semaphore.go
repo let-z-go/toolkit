@@ -22,7 +22,7 @@ type Semaphore struct {
 	openness          int32
 }
 
-func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) {
+func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) *Semaphore {
 	if self.openness != 0 {
 		panic(errors.New("toolkit: semaphore already initialized"))
 	}
@@ -37,6 +37,7 @@ func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) {
 	self.upCondition.Initialize(&self.lock)
 	self.downCondition.Initialize(&self.lock)
 	self.openness = 1
+	return self
 }
 
 func (self *Semaphore) Close(callback func()) error {

@@ -19,7 +19,7 @@ type Logger struct {
 	bases [numberOfSeverityLevels]*log.Logger
 }
 
-func (self *Logger) Initialize(name string, severityLevel SeverityLevel, writer1 io.Writer, writer2 io.Writer) {
+func (self *Logger) Initialize(name string, severityLevel SeverityLevel, writer1 io.Writer, writer2 io.Writer) *Logger {
 	for severityLevel < numberOfSeverityLevels {
 		var writer io.Writer
 
@@ -41,6 +41,8 @@ func (self *Logger) Initialize(name string, severityLevel SeverityLevel, writer1
 		self.bases[severityLevel] = log.New(writer, logPrefix, log.LstdFlags)
 		severityLevel++
 	}
+
+	return self
 }
 
 func (self *Logger) Info(args ...interface{}) {

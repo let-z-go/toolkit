@@ -14,13 +14,14 @@ type Condition struct {
 	listOfWaiters list.List
 }
 
-func (self *Condition) Initialize(lock sync.Locker) {
+func (self *Condition) Initialize(lock sync.Locker) *Condition {
 	if self.lock != nil {
 		panic(errors.New("toolkit: condition already initialized"))
 	}
 
 	self.lock = lock
 	self.listOfWaiters.Initialize()
+	return self
 }
 
 func (self *Condition) WaitFor(context_ context.Context) (bool, error) {

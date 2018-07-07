@@ -12,9 +12,10 @@ type Deque struct {
 	list      list.List
 }
 
-func (self *Deque) Initialize(maxNumberOfNodes int32) {
+func (self *Deque) Initialize(maxNumberOfNodes int32) *Deque {
 	self.semaphore.Initialize(0, maxNumberOfNodes, 0)
 	self.list.Initialize()
+	return self
 }
 
 func (self *Deque) Close(list_ *list.List) error {
