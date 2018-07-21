@@ -69,9 +69,9 @@ func (self *Condition) Signal() {
 
 func (self *Condition) Broadcast() {
 	self.checkUninitialized()
-	getNode := self.listOfWaiters.GetNodes()
+	getNode := self.listOfWaiters.GetNodesSafely()
 
-	for listNode, nextListNode := getNode(), getNode(); listNode != nil; listNode, nextListNode = nextListNode, getNode() {
+	for listNode := getNode(); listNode != nil; listNode = getNode() {
 		listNode.Reset()
 		waiter := (*conditionWaiter)(listNode.GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
 		waiter.event <- struct{}{}
