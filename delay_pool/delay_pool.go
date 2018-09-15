@@ -64,14 +64,10 @@ func (self *DelayPool) GetValue(context_ context.Context) (interface{}, error) {
 			delay := self.nextValueUsableTime.Sub(time.Now())
 
 			if delay >= time.Millisecond {
-				if context_ == nil {
-					time.Sleep(delay)
-				} else {
-					select {
-					case <-time.After(delay):
-					case <-context_.Done():
-						return nil, context_.Err()
-					}
+				select {
+				case <-time.After(delay):
+				case <-context_.Done():
+					return nil, context_.Err()
 				}
 			}
 
@@ -95,14 +91,10 @@ func (self *DelayPool) GetValue(context_ context.Context) (interface{}, error) {
 	self.nextValueUsableTime = self.nextValueUsableTime.Add(self.maxDelay)
 
 	if delay >= time.Millisecond {
-		if context_ == nil {
-			time.Sleep(delay)
-		} else {
-			select {
-			case <-time.After(delay):
-			case <-context_.Done():
-				return nil, context_.Err()
-			}
+		select {
+		case <-time.After(delay):
+		case <-context_.Done():
+			return nil, context_.Err()
 		}
 	}
 

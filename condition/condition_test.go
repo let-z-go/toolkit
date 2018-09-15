@@ -17,7 +17,7 @@ func TestCondition1(t *testing.T) {
 	go func() {
 		m.Lock()
 
-		if ok, _ := c.WaitFor(nil); !ok {
+		if ok, _ := c.WaitFor(context.Background()); !ok {
 			t.Error()
 		}
 
@@ -42,7 +42,7 @@ func TestCondition2(t *testing.T) {
 	go func() {
 		m.Lock()
 
-		if ok, _ := c.WaitFor(nil); !ok {
+		if ok, _ := c.WaitFor(context.Background()); !ok {
 			t.Error()
 		}
 
@@ -53,7 +53,7 @@ func TestCondition2(t *testing.T) {
 	go func() {
 		m.Lock()
 
-		if ok, _ := c.WaitFor(nil); !ok {
+		if ok, _ := c.WaitFor(context.Background()); !ok {
 			t.Error()
 		}
 

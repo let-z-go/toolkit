@@ -1,6 +1,7 @@
 package delay_pool
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -12,7 +13,7 @@ func TestAllocateDelayPoolItem(t *testing.T) {
 	st := time.Now()
 
 	for i := 0; i < 6; i++ {
-		v, e := dp.GetValue(nil)
+		v, e := dp.GetValue(context.Background())
 
 		if e == NoMoreValuesError {
 			break
@@ -31,7 +32,7 @@ func TestAllocateDelayPoolItem(t *testing.T) {
 		t.Errorf("%#v", d)
 	}
 
-	_, e := dp.GetValue(nil)
+	_, e := dp.GetValue(context.Background())
 
 	if e != NoMoreValuesError {
 		t.Errorf("%v", e)

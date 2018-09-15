@@ -18,7 +18,7 @@ func TestSemaphore1(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func(i int) {
-			e := s.Down(nil, false, nil)
+			e := s.Down(context.Background(), false, nil)
 
 			if e == nil {
 				atomic.AddInt32(&sc, 1)
@@ -35,8 +35,8 @@ func TestSemaphore1(t *testing.T) {
 	}
 
 	time.Sleep(time.Second / 10)
-	s.Up(nil, false, nil)
-	s.Up(nil, false, nil)
+	s.Up(context.Background(), false, nil)
+	s.Up(context.Background(), false, nil)
 	time.Sleep(time.Second / 10)
 	s.Close(nil)
 	wg.Wait()
@@ -78,8 +78,8 @@ func TestSemaphore2(t *testing.T) {
 	}
 
 	time.Sleep(time.Second / 10)
-	s.Down(nil, false, nil)
-	s.Down(nil, false, nil)
+	s.Down(context.Background(), false, nil)
+	s.Down(context.Background(), false, nil)
 	time.Sleep(time.Second / 10)
 	wg.Wait()
 
@@ -99,10 +99,10 @@ func TestSemaphore3(t *testing.T) {
 
 		go func() {
 			time.Sleep(time.Second / 10)
-			s.DownAll(nil, false, nil)
+			s.DownAll(context.Background(), false, nil)
 		}()
 
-		s.Up(nil, false, nil)
+		s.Up(context.Background(), false, nil)
 	}
 
 	{
@@ -111,10 +111,10 @@ func TestSemaphore3(t *testing.T) {
 
 		go func() {
 			time.Sleep(time.Second / 10)
-			s.UpAll(nil, false, nil)
+			s.UpAll(context.Background(), false, nil)
 		}()
 
-		s.Down(nil, false, nil)
+		s.Down(context.Background(), false, nil)
 	}
 }
 
@@ -128,7 +128,7 @@ func TestSemaphore4(t *testing.T) {
 			s.DecreaseMinValue(1, true, nil)
 		}()
 
-		s.Up(nil, false, nil)
+		s.Up(context.Background(), false, nil)
 	}
 
 	{
@@ -140,7 +140,7 @@ func TestSemaphore4(t *testing.T) {
 			s.IncreaseMaxValue(1, true, nil)
 		}()
 
-		s.Down(nil, false, nil)
+		s.Down(context.Background(), false, nil)
 	}
 }
 
@@ -151,13 +151,13 @@ func TestSemaphore5(t *testing.T) {
 
 		go func() {
 			time.Sleep(time.Second / 10)
-			s.Down(nil, false, nil)
-			s.Up(nil, false, nil)
+			s.Down(context.Background(), false, nil)
+			s.Up(context.Background(), false, nil)
 			time.Sleep(time.Second / 10)
-			s.Down(nil, false, nil)
+			s.Down(context.Background(), false, nil)
 		}()
 
-		s.Up(nil, false, nil)
+		s.Up(context.Background(), false, nil)
 	}
 
 	{
@@ -166,13 +166,13 @@ func TestSemaphore5(t *testing.T) {
 
 		go func() {
 			time.Sleep(time.Second / 10)
-			s.Up(nil, false, nil)
-			s.Down(nil, false, nil)
+			s.Up(context.Background(), false, nil)
+			s.Down(context.Background(), false, nil)
 			time.Sleep(time.Second / 10)
-			s.Up(nil, false, nil)
+			s.Up(context.Background(), false, nil)
 		}()
 
-		s.Down(nil, false, nil)
+		s.Down(context.Background(), false, nil)
 	}
 }
 
@@ -185,7 +185,7 @@ func TestSemaphore6(t *testing.T) {
 		go func() {
 			time.Sleep(time.Second / 10)
 			cancel()
-			s.Down(nil, false, nil)
+			s.Down(context.Background(), false, nil)
 		}()
 
 		var wg sync.WaitGroup
@@ -193,12 +193,12 @@ func TestSemaphore6(t *testing.T) {
 
 		go func() {
 			go func() {
-				s.Up(nil, false, nil)
+				s.Up(context.Background(), false, nil)
 				wg.Done()
 			}()
 
 			if e := s.Up(ctx, false, nil); e == nil {
-				s.Down(nil, false, nil)
+				s.Down(context.Background(), false, nil)
 			}
 
 			wg.Done()

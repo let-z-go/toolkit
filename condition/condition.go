@@ -32,16 +32,11 @@ func (self *Condition) WaitFor(context_ context.Context) (bool, error) {
 	self.lock.Unlock()
 	var e error
 
-	if context_ == nil {
-		<-waiter.event
+	select {
+	case <-waiter.event:
 		e = nil
-	} else {
-		select {
-		case <-waiter.event:
-			e = nil
-		case <-context_.Done():
-			e = context_.Err()
-		}
+	case <-context_.Done():
+		e = context_.Err()
 	}
 
 	self.lock.Lock()
