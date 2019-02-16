@@ -19,14 +19,14 @@ type Logger struct {
 	bases [numberOfSeverityLevels]*log.Logger
 }
 
-func (self *Logger) Initialize(name string, severityLevel SeverityLevel, writer1 io.Writer, writer2 io.Writer) *Logger {
+func (self *Logger) Initialize(name string, severityLevel SeverityLevel, writer1 io.Writer, writers ...io.Writer) *Logger {
 	for severityLevel < numberOfSeverityLevels {
 		var writer io.Writer
 
-		if severityLevel < SeverityError {
-			writer = writer1
+		if i := int(severityLevel) - 1; i >= 0 && i < len(writers) {
+			writer = writers[i]
 		} else {
-			writer = writer2
+			writer = writer1
 		}
 
 		var logPrefix string
