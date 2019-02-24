@@ -45,6 +45,12 @@ func (self *Logger) Initialize(name string, severityLevel SeverityLevel, writer1
 	return self
 }
 
+func (self *Logger) GC() {
+	for i := range self.bases {
+		self.bases[i] = nil
+	}
+}
+
 func (self *Logger) Info(args ...interface{}) {
 	if base := self.bases[SeverityInfo]; base != nil {
 		base.Print(args...)
