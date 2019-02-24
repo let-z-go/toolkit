@@ -10,7 +10,7 @@ type ByteStream struct {
 	bufferOffset int
 }
 
-func (self *ByteStream) Collect() {
+func (self *ByteStream) GC() {
 	self.base = nil
 }
 

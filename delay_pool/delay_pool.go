@@ -54,7 +54,7 @@ func (self *DelayPool) Reset(values []interface{}, numberOfValues int, maxTotalD
 	self.usedValueCount = 0
 }
 
-func (self *DelayPool) Collect() {
+func (self *DelayPool) GC() {
 	self.values = nil
 }
 
