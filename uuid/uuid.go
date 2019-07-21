@@ -59,12 +59,9 @@ func GenerateUUID4() (UUID, error) {
 	return uuid, nil
 }
 
-func GenerateUUID4Fast() (UUID, error) {
+func GenerateUUID4Fast() UUID {
 	var uuid UUID
-
-	if _, e := rand_.Read(uuid[:]); e != nil {
-		return uuid, e
-	}
+	rand_.Read(uuid[:])
 
 	for i := range uuid {
 		uuid[i] ^= mask[i]
@@ -72,7 +69,7 @@ func GenerateUUID4Fast() (UUID, error) {
 
 	uuid[6] = (uuid[6] & 0x0F) | 0x40
 	uuid[8] = (uuid[8] & 0x3F) | 0x80
-	return uuid, nil
+	return uuid
 }
 
 func UUIDFromBytes(bytes []byte) UUID {

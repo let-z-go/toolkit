@@ -74,7 +74,7 @@ func TestDeque2(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 
-		go func() {
+		go func(i int) {
 			if e := d.AppendNode(context.Background(), &(&Foo{bar: i}).listNode); e != nil {
 				if e != semaphore.SemaphoreClosedError {
 					t.Errorf("%#v != %#v", e, semaphore.SemaphoreClosedError)
@@ -84,7 +84,7 @@ func TestDeque2(t *testing.T) {
 			}
 
 			wg.Done()
-		}()
+		}(i)
 	}
 
 	time.Sleep(time.Second / 20)

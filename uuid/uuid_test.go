@@ -26,11 +26,7 @@ func TestGenerateUUID4(t *testing.T) {
 
 func TestGenerateUUID4Fast(t *testing.T) {
 	for i := 0; i < 1024; i++ {
-		u, e := GenerateUUID4Fast()
-
-		if e != nil {
-			t.Fatalf("%v", e)
-		}
+		u := GenerateUUID4Fast()
 
 		s := u.String()
 
