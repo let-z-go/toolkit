@@ -27,23 +27,23 @@ func (self *Condition) Initialize(lock sync.Locker) *Condition {
 func (self *Condition) WaitFor(context_ context.Context) (bool, error) {
 	self.checkUninitialized()
 	var waiter conditionWaiter
-	waiter.event = make(chan struct{}, 1)
-	self.listOfWaiters.AppendNode(&waiter.listNode)
+	waiter.Event = make(chan struct{}, 1)
+	self.listOfWaiters.AppendNode(&waiter.ListNode)
 	self.lock.Unlock()
 	var e error
 
 	select {
-	case <-waiter.event:
+	case <-waiter.Event:
 		e = nil
 	case <-context_.Done():
 		e = context_.Err()
 	}
 
 	self.lock.Lock()
-	ok := e == nil || waiter.listNode.IsReset()
+	ok := e == nil || waiter.ListNode.IsReset()
 
 	if !ok {
-		waiter.listNode.Remove()
+		waiter.ListNode.Remove()
 	}
 
 	return ok, e
@@ -56,10 +56,10 @@ func (self *Condition) Signal() {
 		return
 	}
 
-	waiter := (*conditionWaiter)(self.listOfWaiters.GetHead().GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
-	waiter.listNode.Remove()
-	waiter.listNode.Reset()
-	waiter.event <- struct{}{}
+	waiter := (*conditionWaiter)(self.listOfWaiters.GetHead().GetContainer(unsafe.Offsetof(conditionWaiter{}.ListNode)))
+	waiter.ListNode.Remove()
+	waiter.ListNode.Reset()
+	waiter.Event <- struct{}{}
 }
 
 func (self *Condition) Broadcast() {
@@ -68,8 +68,8 @@ func (self *Condition) Broadcast() {
 
 	for listNode := getNode(); listNode != nil; listNode = getNode() {
 		listNode.Reset()
-		waiter := (*conditionWaiter)(listNode.GetContainer(unsafe.Offsetof(conditionWaiter{}.listNode)))
-		waiter.event <- struct{}{}
+		waiter := (*conditionWaiter)(listNode.GetContainer(unsafe.Offsetof(conditionWaiter{}.ListNode)))
+		waiter.Event <- struct{}{}
 	}
 
 	self.listOfWaiters.Initialize()
@@ -82,6 +82,6 @@ func (self *Condition) checkUninitialized() {
 }
 
 type conditionWaiter struct {
-	listNode list.ListNode
-	event    chan struct{}
+	ListNode list.ListNode
+	Event    chan struct{}
 }
