@@ -1,9 +1,9 @@
 package uuid
 
 import (
-	srand "crypto/rand"
+	crand "crypto/rand"
 	"encoding/base64"
-	"math/rand"
+	mrand "math/rand"
 	"time"
 )
 
@@ -50,7 +50,7 @@ func (self UUID) Base64() string {
 func GenerateUUID4() (UUID, error) {
 	var uuid UUID
 
-	if _, e := srand.Read(uuid[:]); e != nil {
+	if _, e := crand.Read(uuid[:]); e != nil {
 		return uuid, e
 	}
 
@@ -61,7 +61,7 @@ func GenerateUUID4() (UUID, error) {
 
 func GenerateUUID4Fast() UUID {
 	var uuid UUID
-	rand_.Read(uuid[:])
+	rand.Read(uuid[:])
 
 	for i := range uuid {
 		uuid[i] ^= mask[i]
@@ -79,13 +79,13 @@ func UUIDFromBytes(bytes []byte) UUID {
 }
 
 var hexDigits = [...]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
-var rand_ *rand.Rand
+var rand *mrand.Rand
 var mask [16]byte
 
 func init() {
-	rand_ = rand.New(rand.NewSource(time.Now().UnixNano()))
+	rand = mrand.New(mrand.NewSource(time.Now().UnixNano()))
 
-	if _, e := srand.Read(mask[:]); e != nil {
+	if _, e := crand.Read(mask[:]); e != nil {
 		panic(e)
 	}
 }
