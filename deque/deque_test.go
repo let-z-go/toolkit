@@ -9,7 +9,6 @@ import (
 	"unsafe"
 
 	"github.com/let-z-go/intrusives/list"
-	"github.com/let-z-go/toolkit/semaphore"
 )
 
 type Foo struct {
@@ -18,8 +17,7 @@ type Foo struct {
 }
 
 func TestDeque1(t *testing.T) {
-	var d Deque
-	d.Initialize(2)
+	d := new(Deque).Init(2)
 	f := int32(0)
 
 	go func() {
@@ -37,7 +35,7 @@ func TestDeque1(t *testing.T) {
 		t.Errorf("%#v", f2)
 	}
 
-	d.CommitNodeRemovals(1)
+	d.CommitNodesRemoval(1)
 	time.Sleep(time.Second / 20)
 
 	if f2 := atomic.LoadInt32(&f); f2 != 3 {
@@ -45,19 +43,19 @@ func TestDeque1(t *testing.T) {
 	}
 
 	var ln *list.ListNode
-	ln, _ = d.RemoveHead(context.Background(), true)
+	ln, _ = d.RemoveHead(context.Background(), false)
 
 	if f := (*Foo)(ln.GetContainer(unsafe.Offsetof(Foo{}.listNode))); f.bar != 1 {
 		t.Errorf("%#v", f.bar)
 	}
 
-	ln, _ = d.RemoveHead(context.Background(), true)
+	ln, _ = d.RemoveHead(context.Background(), false)
 
 	if f := (*Foo)(ln.GetContainer(unsafe.Offsetof(Foo{}.listNode))); f.bar != 2 {
 		t.Errorf("%#v", f.bar)
 	}
 
-	ln, _ = d.RemoveHead(context.Background(), true)
+	ln, _ = d.RemoveHead(context.Background(), false)
 
 	if f := (*Foo)(ln.GetContainer(unsafe.Offsetof(Foo{}.listNode))); f.bar != 3 {
 		t.Errorf("%#v", f.bar)
@@ -66,8 +64,7 @@ func TestDeque1(t *testing.T) {
 }
 
 func TestDeque2(t *testing.T) {
-	var d Deque
-	d.Initialize(3)
+	d := new(Deque).Init(3)
 	var wg sync.WaitGroup
 	ec := int32(0)
 
@@ -75,9 +72,9 @@ func TestDeque2(t *testing.T) {
 		wg.Add(1)
 
 		go func(i int) {
-			if e := d.AppendNode(context.Background(), &(&Foo{bar: i}).listNode); e != nil {
-				if e != semaphore.SemaphoreClosedError {
-					t.Errorf("%#v != %#v", e, semaphore.SemaphoreClosedError)
+			if err := d.AppendNode(context.Background(), &(&Foo{bar: i}).listNode); err != nil {
+				if err != ErrDequeClosed {
+					t.Errorf("%#v != %#v", err, ErrDequeClosed)
 				}
 
 				atomic.AddInt32(&ec, 1)

@@ -30,12 +30,12 @@ retry:
 				goto retry2
 			}
 
-			var e error
-			value2, e = valueFactory()
+			var err error
+			value2, err = valueFactory()
 
-			if e != nil {
+			if err != nil {
 				lock_.Unlock()
-				return nil, nil, e
+				return nil, nil, err
 			}
 
 			self.base.Store(key, value2)

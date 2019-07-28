@@ -6,12 +6,12 @@ import (
 )
 
 func RunBackgroundTask(bgContext context.Context, bgTask func(context.Context)) func() {
-	context_, cancel := context.WithCancel(bgContext)
+	ctx, cancel := context.WithCancel(bgContext)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
 	go func() {
-		bgTask(context_)
+		bgTask(ctx)
 		wg.Done()
 	}()
 

@@ -10,10 +10,6 @@ type ByteStream struct {
 	bufferOffset int
 }
 
-func (self *ByteStream) Finalize() {
-	self.base = nil
-}
-
 func (self *ByteStream) Read(buffer []byte) int {
 	dataSize := copy(buffer, self.GetData())
 	self.doSkip(dataSize)
@@ -41,8 +37,8 @@ func (self *ByteStream) WriteDirectly(bufferSize int, callback func([]byte) erro
 	bufferSize = int(utils.MaxOfZero(int64(bufferSize)))
 	self.ReserveBuffer(bufferSize)
 
-	if e := callback(self.GetBuffer()); e != nil {
-		return e
+	if err := callback(self.GetBuffer()); err != nil {
+		return err
 	}
 
 	self.doCommitBuffer(bufferSize)
@@ -95,6 +91,10 @@ func (self *ByteStream) CommitBuffer(bufferSize int) int {
 
 	self.doCommitBuffer(bufferSize)
 	return bufferSize
+}
+
+func (self *ByteStream) GetSize() int {
+	return len(self.base)
 }
 
 func (self *ByteStream) GetData() []byte {

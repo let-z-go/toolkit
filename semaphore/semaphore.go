@@ -12,18 +12,18 @@ import (
 )
 
 type Semaphore struct {
-	lock              sync.Mutex
-	minValue          int32
-	maxValue          int32
-	value             int32
-	upWaiterCountX2   uint32
-	downWaiterCountX2 uint32
-	upCondition       condition.Condition
-	downCondition     condition.Condition
-	isClosed          int32
+	lock            sync.Mutex
+	minValue        int
+	maxValue        int
+	value           int
+	upWaiterCount   uint
+	downWaiterCount uint
+	upCondition     condition.Condition
+	downCondition   condition.Condition
+	isClosed        int32
 }
 
-func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) *Semaphore {
+func (self *Semaphore) Init(minValue int, maxValue int, value int) *Semaphore {
 	utils.Assert(value >= minValue && value <= maxValue, func() string {
 		return fmt.Sprintf("toolkit/semaphore: invalid argument: value=%#v, minValue=%#v, maxValue=%#v", value, minValue, maxValue)
 	})
@@ -31,14 +31,14 @@ func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) *
 	self.minValue = minValue
 	self.maxValue = maxValue
 	self.value = value
-	self.upCondition.Initialize(&self.lock)
-	self.downCondition.Initialize(&self.lock)
+	self.upCondition.Init(&self.lock)
+	self.downCondition.Init(&self.lock)
 	return self
 }
 
-func (self *Semaphore) Close(callback func()) error {
+func (self *Semaphore) Close(callback func()) (int, error) {
 	if !atomic.CompareAndSwapInt32(&self.isClosed, 0, 1) {
-		return SemaphoreClosedError
+		return 0, ErrSemaphoreClosed
 	}
 
 	self.lock.Lock()
@@ -50,30 +50,30 @@ func (self *Semaphore) Close(callback func()) error {
 	self.upCondition.Broadcast()
 	self.downCondition.Broadcast()
 	self.lock.Unlock()
-	return nil
+	return self.value, nil
 }
 
-func (self *Semaphore) Up(context_ context.Context, increaseMinValue bool, callback func()) error {
-	_, e := self.doUp(context_, false, increaseMinValue, callback)
-	return e
+func (self *Semaphore) Up(ctx context.Context, increaseMinValue bool, callback func()) error {
+	_, err := self.doUp(ctx, false, increaseMinValue, callback)
+	return err
 }
 
-func (self *Semaphore) UpAll(context_ context.Context, increaseMinValue bool, callback func()) (int32, error) {
-	return self.doUp(context_, true, increaseMinValue, callback)
+func (self *Semaphore) UpAll(ctx context.Context, increaseMinValue bool, callback func()) (int, error) {
+	return self.doUp(ctx, true, increaseMinValue, callback)
 }
 
-func (self *Semaphore) Down(context_ context.Context, decreaseMaxValue bool, callback func()) error {
-	_, e := self.doDown(context_, false, decreaseMaxValue, callback)
-	return e
+func (self *Semaphore) Down(ctx context.Context, decreaseMaxValue bool, callback func()) error {
+	_, err := self.doDown(ctx, false, decreaseMaxValue, callback)
+	return err
 }
 
-func (self *Semaphore) DownAll(context_ context.Context, decreaseMaxValue bool, callback func()) (int32, error) {
-	return self.doDown(context_, true, decreaseMaxValue, callback)
+func (self *Semaphore) DownAll(ctx context.Context, decreaseMaxValue bool, callback func()) (int, error) {
+	return self.doDown(ctx, true, decreaseMaxValue, callback)
 }
 
-func (self *Semaphore) IncreaseMaxValue(increment int32, increaseValue bool, callback func()) error {
+func (self *Semaphore) IncreaseMaxValue(increment int, increaseValue bool, callback func()) error {
 	if self.IsClosed() {
-		return SemaphoreClosedError
+		return ErrSemaphoreClosed
 	}
 
 	if increment < 1 {
@@ -104,9 +104,9 @@ func (self *Semaphore) IncreaseMaxValue(increment int32, increaseValue bool, cal
 	return nil
 }
 
-func (self *Semaphore) DecreaseMinValue(decrement int32, decreaseValue bool, callback func()) error {
+func (self *Semaphore) DecreaseMinValue(decrement int, decreaseValue bool, callback func()) error {
 	if self.IsClosed() {
-		return SemaphoreClosedError
+		return ErrSemaphoreClosed
 	}
 
 	if decrement < 1 {
@@ -137,31 +137,52 @@ func (self *Semaphore) DecreaseMinValue(decrement int32, decreaseValue bool, cal
 	return nil
 }
 
+func (self *Semaphore) GetMinValue() int {
+	self.lock.Lock()
+	minValue := self.minValue
+	self.lock.Unlock()
+	return minValue
+}
+
+func (self *Semaphore) GetMaxValue() int {
+	self.lock.Lock()
+	maxValue := self.maxValue
+	self.lock.Unlock()
+	return maxValue
+}
+
+func (self *Semaphore) GetValue() int {
+	self.lock.Lock()
+	value := self.value
+	self.lock.Unlock()
+	return value
+}
+
 func (self *Semaphore) IsClosed() bool {
 	return atomic.LoadInt32(&self.isClosed) == 1
 }
 
-func (self *Semaphore) doUp(context_ context.Context, maximizeIncrement bool, increaseMinValue bool, callback func()) (int32, error) {
+func (self *Semaphore) doUp(ctx context.Context, maximizeIncrement bool, increaseMinValue bool, callback func()) (int, error) {
 	if self.IsClosed() {
-		return 0, SemaphoreClosedError
+		return 0, ErrSemaphoreClosed
 	}
 
 	self.lock.Lock()
 
 	if self.IsClosed() {
 		self.lock.Unlock()
-		return 0, SemaphoreClosedError
+		return 0, ErrSemaphoreClosed
 	}
 
-	if self.value == self.maxValue || self.upWaiterCountX2 >= 2 {
-		self.upWaiterCountX2 += 2
+	if self.value == self.maxValue || self.upWaiterCount >= 1 {
+		self.upWaiterCount += 1
 
 		for {
-			if ok, e := self.upCondition.WaitFor(context_); e != nil {
-				self.upWaiterCountX2 -= 2
+			if ok, err := self.upCondition.WaitFor(ctx); err != nil {
+				self.upWaiterCount -= 1
 
 				if ok {
-					self.upWaiterCountX2 &^= 1
+					self.upWaiterCount &^= flagWaiterNotified
 
 					if self.value < self.maxValue {
 						self.notifyUpWaiter()
@@ -169,29 +190,29 @@ func (self *Semaphore) doUp(context_ context.Context, maximizeIncrement bool, in
 				}
 
 				self.lock.Unlock()
-				return 0, e
+				return 0, err
 			}
 
 			if self.IsClosed() {
 				self.lock.Unlock()
-				return 0, SemaphoreClosedError
+				return 0, ErrSemaphoreClosed
 			}
 
-			self.upWaiterCountX2 &^= 1
+			self.upWaiterCount &^= flagWaiterNotified
 
 			if self.value < self.maxValue {
 				break
 			}
 		}
 
-		self.upWaiterCountX2 -= 2
+		self.upWaiterCount -= 1
 	}
 
 	if callback != nil {
 		callback()
 	}
 
-	var increment int32
+	var increment int
 
 	if maximizeIncrement {
 		increment = self.maxValue - self.value
@@ -217,27 +238,27 @@ func (self *Semaphore) doUp(context_ context.Context, maximizeIncrement bool, in
 	return increment, nil
 }
 
-func (self *Semaphore) doDown(context_ context.Context, maximizeDecrement bool, decreaseMaxValue bool, callback func()) (int32, error) {
+func (self *Semaphore) doDown(ctx context.Context, maximizeDecrement bool, decreaseMaxValue bool, callback func()) (int, error) {
 	if self.IsClosed() {
-		return 0, SemaphoreClosedError
+		return 0, ErrSemaphoreClosed
 	}
 
 	self.lock.Lock()
 
 	if self.IsClosed() {
 		self.lock.Unlock()
-		return 0, SemaphoreClosedError
+		return 0, ErrSemaphoreClosed
 	}
 
-	if self.value == self.minValue || self.downWaiterCountX2 >= 2 {
-		self.downWaiterCountX2 += 2
+	if self.value == self.minValue || self.downWaiterCount >= 1 {
+		self.downWaiterCount += 1
 
 		for {
-			if ok, e := self.downCondition.WaitFor(context_); e != nil {
-				self.downWaiterCountX2 -= 2
+			if ok, err := self.downCondition.WaitFor(ctx); err != nil {
+				self.downWaiterCount -= 1
 
 				if ok {
-					self.downWaiterCountX2 &^= 1
+					self.downWaiterCount &^= flagWaiterNotified
 
 					if self.value > self.minValue {
 						self.notifyDownWaiter()
@@ -245,29 +266,29 @@ func (self *Semaphore) doDown(context_ context.Context, maximizeDecrement bool, 
 				}
 
 				self.lock.Unlock()
-				return 0, e
+				return 0, err
 			}
 
 			if self.IsClosed() {
 				self.lock.Unlock()
-				return 0, SemaphoreClosedError
+				return 0, ErrSemaphoreClosed
 			}
 
-			self.downWaiterCountX2 &^= 1
+			self.downWaiterCount &^= flagWaiterNotified
 
 			if self.value > self.minValue {
 				break
 			}
 		}
 
-		self.downWaiterCountX2 -= 2
+		self.downWaiterCount -= 1
 	}
 
 	if callback != nil {
 		callback()
 	}
 
-	var decrement int32
+	var decrement int
 
 	if maximizeDecrement {
 		decrement = self.value - self.minValue
@@ -294,17 +315,19 @@ func (self *Semaphore) doDown(context_ context.Context, maximizeDecrement bool, 
 }
 
 func (self *Semaphore) notifyUpWaiter() {
-	if self.upWaiterCountX2 >= 2 && self.upWaiterCountX2&1 == 0 {
+	if self.upWaiterCount&flagWaiterNotified == 0 && self.upWaiterCount >= 1 {
 		self.upCondition.Signal()
-		self.upWaiterCountX2 |= 1
+		self.upWaiterCount |= flagWaiterNotified
 	}
 }
 
 func (self *Semaphore) notifyDownWaiter() {
-	if self.downWaiterCountX2 >= 2 && self.downWaiterCountX2&1 == 0 {
+	if self.downWaiterCount&flagWaiterNotified == 0 && self.downWaiterCount >= 1 {
 		self.downCondition.Signal()
-		self.downWaiterCountX2 |= 1
+		self.downWaiterCount |= flagWaiterNotified
 	}
 }
 
-var SemaphoreClosedError = errors.New("toolkit/semaphore: semaphore closed")
+var ErrSemaphoreClosed = errors.New("toolkit/semaphore: semaphore closed")
+
+const flagWaiterNotified = (^uint(0) >> 1) + 1

@@ -4,6 +4,8 @@ import (
 	"context"
 	"net"
 	"time"
+
+	"github.com/let-z-go/toolkit/utils"
 )
 
 type Connection struct {
@@ -11,7 +13,11 @@ type Connection struct {
 	preRWCs chan *connectionPreRWC
 }
 
-func (self *Connection) Adopt(raw net.Conn) {
+func (self *Connection) Init(raw net.Conn) *Connection {
+	utils.Assert(raw != nil, func() string {
+		return "toolkit/connection: invalid argument: raw is nil"
+	})
+
 	self.raw = raw
 	self.preRWCs = make(chan *connectionPreRWC, 2)
 
@@ -26,7 +32,7 @@ func (self *Connection) Adopt(raw net.Conn) {
 			case preRWC := <-self.preRWCs:
 				switch preRWC.type_ {
 				case 'R':
-					if preRWC.deadline != readDeadline {
+					if !preRWC.deadline.Equal(readDeadline) {
 						readDeadline = preRWC.deadline
 						self.raw.SetReadDeadline(readDeadline)
 					}
@@ -34,7 +40,7 @@ func (self *Connection) Adopt(raw net.Conn) {
 					readCancellation = preRWC.cancellation
 					close(preRWC.completion)
 				case 'W':
-					if preRWC.deadline != writeDeadline {
+					if !preRWC.deadline.Equal(writeDeadline) {
 						writeDeadline = preRWC.deadline
 						self.raw.SetWriteDeadline(writeDeadline)
 					}
@@ -42,6 +48,7 @@ func (self *Connection) Adopt(raw net.Conn) {
 					writeCancellation = preRWC.cancellation
 					close(preRWC.completion)
 				default: // case 'C':
+					close(self.preRWCs)
 					close(preRWC.completion)
 					return
 				}
@@ -56,62 +63,67 @@ func (self *Connection) Adopt(raw net.Conn) {
 			}
 		}
 	}()
-}
 
-func (self *Connection) Read(context_ context.Context, deadline time.Time, buffer []byte) (int, error) {
-	self.PreRead(context_, deadline)
-	return self.DoRead(context_, buffer)
-}
-
-func (self *Connection) PreRead(context_ context.Context, deadline time.Time) {
-	completion := make(chan struct{})
-	self.preRWCs <- &connectionPreRWC{'R', context_.Done(), deadline, completion}
-	<-completion
-}
-
-func (self *Connection) DoRead(context_ context.Context, buffer []byte) (int, error) {
-	n, e := self.raw.Read(buffer)
-
-	if e != nil {
-		if e2 := context_.Err(); e2 != nil {
-			e = e2
-		}
-	}
-
-	return n, e
-}
-
-func (self *Connection) Write(context_ context.Context, deadline time.Time, data []byte) (int, error) {
-	self.PreWrite(context_, deadline)
-	return self.DoWrite(context_, data)
-}
-
-func (self *Connection) PreWrite(context_ context.Context, deadline time.Time) {
-	completion := make(chan struct{})
-	self.preRWCs <- &connectionPreRWC{'W', context_.Done(), deadline, completion}
-	<-completion
-}
-
-func (self *Connection) DoWrite(context_ context.Context, data []byte) (int, error) {
-	n, e := self.raw.Write(data)
-
-	if e != nil {
-		if e2 := context_.Err(); e2 != nil {
-			e = e2
-		}
-	}
-
-	return n, e
+	return self
 }
 
 func (self *Connection) Close() error {
 	completion := make(chan struct{})
 	self.preRWCs <- &connectionPreRWC{'C', nil, time.Time{}, completion}
 	<-completion
-	e := self.raw.Close()
+	raw := self.raw
 	self.raw = nil
-	self.preRWCs = nil
-	return e
+	return raw.Close()
+}
+
+func (self *Connection) Read(ctx context.Context, deadline time.Time, buffer []byte) (int, error) {
+	self.PreRead(ctx, deadline)
+	return self.DoRead(ctx, buffer)
+}
+
+func (self *Connection) PreRead(ctx context.Context, deadline time.Time) {
+	completion := make(chan struct{})
+	self.preRWCs <- &connectionPreRWC{'R', ctx.Done(), deadline, completion}
+	<-completion
+}
+
+func (self *Connection) DoRead(ctx context.Context, buffer []byte) (int, error) {
+	n, err := self.raw.Read(buffer)
+
+	if err != nil {
+		if err2 := ctx.Err(); err2 != nil {
+			err = err2
+		}
+	}
+
+	return n, err
+}
+
+func (self *Connection) Write(ctx context.Context, deadline time.Time, data []byte) (int, error) {
+	self.PreWrite(ctx, deadline)
+	return self.DoWrite(ctx, data)
+}
+
+func (self *Connection) PreWrite(ctx context.Context, deadline time.Time) {
+	completion := make(chan struct{})
+	self.preRWCs <- &connectionPreRWC{'W', ctx.Done(), deadline, completion}
+	<-completion
+}
+
+func (self *Connection) DoWrite(ctx context.Context, data []byte) (int, error) {
+	n, err := self.raw.Write(data)
+
+	if err != nil {
+		if err2 := ctx.Err(); err2 != nil {
+			err = err2
+		}
+	}
+
+	return n, err
+}
+
+func (self *Connection) IsClosed() bool {
+	return self.raw == nil
 }
 
 type connectionPreRWC struct {

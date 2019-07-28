@@ -9,8 +9,7 @@ import (
 )
 
 func TestSemaphore1(t *testing.T) {
-	var s Semaphore
-	s.Initialize(0, 100, 50)
+	s := new(Semaphore).Init(0, 100, 50)
 	var wg sync.WaitGroup
 	sc := int32(0)
 	fc := int32(0)
@@ -18,13 +17,13 @@ func TestSemaphore1(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func(i int) {
-			e := s.Down(context.Background(), false, nil)
+			err := s.Down(context.Background(), false, nil)
 
-			if e == nil {
+			if err == nil {
 				atomic.AddInt32(&sc, 1)
 			} else {
-				if e != SemaphoreClosedError {
-					t.Errorf("%#v != %#v", e, SemaphoreClosedError)
+				if err != ErrSemaphoreClosed {
+					t.Errorf("%#v != %#v", err, ErrSemaphoreClosed)
 				}
 
 				atomic.AddInt32(&fc, 1)
@@ -51,8 +50,7 @@ func TestSemaphore1(t *testing.T) {
 }
 
 func TestSemaphore2(t *testing.T) {
-	var s Semaphore
-	s.Initialize(0, 50, 0)
+	s := new(Semaphore).Init(0, 50, 0)
 	var wg sync.WaitGroup
 	sc := int32(0)
 	fc := int32(0)
@@ -62,11 +60,11 @@ func TestSemaphore2(t *testing.T) {
 		go func(i int) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second/20)
 
-			if e := s.Up(ctx, false, nil); e == nil {
+			if err := s.Up(ctx, false, nil); err == nil {
 				atomic.AddInt32(&sc, 1)
 			} else {
-				if e != context.DeadlineExceeded {
-					t.Errorf("%#v != %#v", e, context.DeadlineExceeded)
+				if err != context.DeadlineExceeded {
+					t.Errorf("%#v != %#v", err, context.DeadlineExceeded)
 				}
 
 				atomic.AddInt32(&fc, 1)
@@ -94,8 +92,7 @@ func TestSemaphore2(t *testing.T) {
 
 func TestSemaphore3(t *testing.T) {
 	{
-		var s Semaphore
-		s.Initialize(0, 10, 10)
+		s := new(Semaphore).Init(0, 10, 10)
 
 		go func() {
 			time.Sleep(time.Second / 10)
@@ -106,8 +103,7 @@ func TestSemaphore3(t *testing.T) {
 	}
 
 	{
-		var s Semaphore
-		s.Initialize(0, 10, 0)
+		s := new(Semaphore).Init(0, 10, 0)
 
 		go func() {
 			time.Sleep(time.Second / 10)
@@ -120,8 +116,7 @@ func TestSemaphore3(t *testing.T) {
 
 func TestSemaphore4(t *testing.T) {
 	{
-		var s Semaphore
-		s.Initialize(0, 10, 10)
+		s := new(Semaphore).Init(0, 10, 10)
 
 		go func() {
 			time.Sleep(time.Second / 10)
@@ -132,8 +127,7 @@ func TestSemaphore4(t *testing.T) {
 	}
 
 	{
-		var s Semaphore
-		s.Initialize(0, 10, 0)
+		s := new(Semaphore).Init(0, 10, 0)
 
 		go func() {
 			time.Sleep(time.Second / 10)
@@ -146,8 +140,7 @@ func TestSemaphore4(t *testing.T) {
 
 func TestSemaphore5(t *testing.T) {
 	{
-		var s Semaphore
-		s.Initialize(0, 10, 10)
+		s := new(Semaphore).Init(0, 10, 10)
 
 		go func() {
 			time.Sleep(time.Second / 10)
@@ -161,8 +154,7 @@ func TestSemaphore5(t *testing.T) {
 	}
 
 	{
-		var s Semaphore
-		s.Initialize(0, 10, 10)
+		s := new(Semaphore).Init(0, 10, 10)
 
 		go func() {
 			time.Sleep(time.Second / 10)
@@ -178,8 +170,7 @@ func TestSemaphore5(t *testing.T) {
 
 func TestSemaphore6(t *testing.T) {
 	{
-		var s Semaphore
-		s.Initialize(0, 10, 10)
+		s := new(Semaphore).Init(0, 10, 10)
 		ctx, cancel := context.WithCancel(context.Background())
 
 		go func() {
@@ -197,7 +188,7 @@ func TestSemaphore6(t *testing.T) {
 				wg.Done()
 			}()
 
-			if e := s.Up(ctx, false, nil); e == nil {
+			if err := s.Up(ctx, false, nil); err == nil {
 				s.Down(context.Background(), false, nil)
 			}
 

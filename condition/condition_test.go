@@ -9,8 +9,7 @@ import (
 
 func TestCondition1(t *testing.T) {
 	var m sync.Mutex
-	var c Condition
-	c.Initialize(&m)
+	c := new(Condition).Init(&m)
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -34,8 +33,7 @@ func TestCondition1(t *testing.T) {
 
 func TestCondition2(t *testing.T) {
 	var m sync.Mutex
-	var c Condition
-	c.Initialize(&m)
+	c := new(Condition).Init(&m)
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -70,8 +68,7 @@ func TestCondition2(t *testing.T) {
 
 func TestCondition3(t *testing.T) {
 	var m sync.Mutex
-	var c Condition
-	c.Initialize(&m)
+	c := new(Condition).Init(&m)
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -79,8 +76,8 @@ func TestCondition3(t *testing.T) {
 		m.Lock()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second/20)
 
-		if _, e := c.WaitFor(ctx); e != context.DeadlineExceeded {
-			t.Errorf("%#v != %#v", e, context.DeadlineExceeded)
+		if _, err := c.WaitFor(ctx); err != context.DeadlineExceeded {
+			t.Errorf("%#v != %#v", err, context.DeadlineExceeded)
 		}
 
 		cancel()

@@ -6,10 +6,10 @@ import (
 
 func TestGenerateUUID4(t *testing.T) {
 	for i := 0; i < 1024; i++ {
-		u, e := GenerateUUID4()
+		u, err := GenerateUUID4()
 
-		if e != nil {
-			t.Fatalf("%v", e)
+		if err != nil {
+			t.Fatalf("%v", err)
 		}
 
 		s := u.String()

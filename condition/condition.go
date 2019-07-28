@@ -13,34 +13,34 @@ type Condition struct {
 	listOfWaiters list.List
 }
 
-func (self *Condition) Initialize(lock sync.Locker) *Condition {
+func (self *Condition) Init(lock sync.Locker) *Condition {
 	self.lock = lock
-	self.listOfWaiters.Initialize()
+	self.listOfWaiters.Init()
 	return self
 }
 
-func (self *Condition) WaitFor(context_ context.Context) (bool, error) {
+func (self *Condition) WaitFor(ctx context.Context) (bool, error) {
 	var waiter conditionWaiter
 	waiter.Event = make(chan struct{})
 	self.listOfWaiters.AppendNode(&waiter.ListNode)
 	self.lock.Unlock()
-	var e error
+	var err error
 
 	select {
 	case <-waiter.Event:
-		e = nil
-	case <-context_.Done():
-		e = context_.Err()
+		err = nil
+	case <-ctx.Done():
+		err = ctx.Err()
 	}
 
 	self.lock.Lock()
-	ok := e == nil || waiter.ListNode.IsReset()
+	ok := err == nil || waiter.ListNode.IsReset()
 
 	if !ok {
 		waiter.ListNode.Remove()
 	}
 
-	return ok, e
+	return ok, err
 }
 
 func (self *Condition) Signal() {
@@ -63,7 +63,7 @@ func (self *Condition) Broadcast() {
 		close(waiter.Event)
 	}
 
-	self.listOfWaiters.Initialize()
+	self.listOfWaiters.Init()
 }
 
 type conditionWaiter struct {

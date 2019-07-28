@@ -2,90 +2,73 @@ package uuid
 
 import (
 	crand "crypto/rand"
-	"encoding/base64"
+	"encoding/binary"
 	mrand "math/rand"
-	"time"
 )
 
-type UUID [16]byte
+type UUID [2]uint64
 
 func (self UUID) IsZero() bool {
-	return (self[0x0] | self[0x1] | self[0x2] | self[0x3] |
-		self[0x4] | self[0x5] | self[0x6] | self[0x7] |
-		self[0x8] | self[0x9] | self[0xA] | self[0xB] |
-		self[0xC] | self[0xD] | self[0xE] | self[0xF]) == 0
+	return (self[0] | self[1]) == 0
 }
 
 func (self UUID) String() string {
-	i := 0
-	rawString := make([]byte, 36)
+	i := uint(0)
+	buffer := make([]byte, 37)
 	j := 0
 
-	for _, k := range [...]int{4, 6, 8, 10} {
-		for ; i < k; i++ {
-			x := self[i]
-			rawString[j] = hexDigits[x>>4]
-			rawString[j+1] = hexDigits[x&0xF]
-			j += 2
+	for _, k := range [...]uint{32, 48, 64, 80, 128} {
+		for ; i < k; i += 16 {
+			x := (self[i/64] >> (i % 64)) & 0xFFFF
+			buffer[j] = hexDigits[(x>>4)&0xF]
+			buffer[j+1] = hexDigits[x&0xF]
+			buffer[j+2] = hexDigits[x>>12]
+			buffer[j+3] = hexDigits[(x>>8)&0xF]
+			j += 4
 		}
 
-		rawString[j] = '-'
+		buffer[j] = '-'
 		j++
 	}
 
-	for ; i < 16; i++ {
-		x := self[i]
-		rawString[j] = hexDigits[x>>4]
-		rawString[j+1] = hexDigits[x&0xF]
-		j += 2
-	}
-
-	return string(rawString)
-}
-
-func (self UUID) Base64() string {
-	return base64.RawURLEncoding.EncodeToString(self[:])
+	return string(buffer[:36])
 }
 
 func GenerateUUID4() (UUID, error) {
-	var uuid UUID
+	var buffer [16]byte
 
-	if _, e := crand.Read(uuid[:]); e != nil {
-		return uuid, e
+	if _, err := crand.Read(buffer[:]); err != nil {
+		return UUID{}, err
 	}
 
-	uuid[6] = (uuid[6] & 0x0F) | 0x40
-	uuid[8] = (uuid[8] & 0x3F) | 0x80
+	uuid := UUID{binary.LittleEndian.Uint64(buffer[:8]), binary.LittleEndian.Uint64(buffer[8:])}
+	uuid[0] = (uuid[0] & 0xFF0FFFFFFFFFFFFF) | 0x0040000000000000
+	uuid[1] = (uuid[1] & 0xFFFFFFFFFFFFFF3F) | 0x0000000000000080
 	return uuid, nil
 }
 
 func GenerateUUID4Fast() UUID {
-	var uuid UUID
-	rand.Read(uuid[:])
-
-	for i := range uuid {
-		uuid[i] ^= mask[i]
-	}
-
-	uuid[6] = (uuid[6] & 0x0F) | 0x40
-	uuid[8] = (uuid[8] & 0x3F) | 0x80
+	var buffer [16]byte
+	mrand.Read(buffer[:])
+	uuid := UUID{binary.LittleEndian.Uint64(buffer[:8]), binary.LittleEndian.Uint64(buffer[8:])}
+	uuid[0] = ((uuid[0] ^ mask[0]) & 0xFF0FFFFFFFFFFFFF) | 0x0040000000000000
+	uuid[1] = ((uuid[1] ^ mask[1]) & 0xFFFFFFFFFFFFFF3F) | 0x0000000000000080
 	return uuid
 }
 
-func UUIDFromBytes(bytes []byte) UUID {
-	var uuid UUID
-	copy(uuid[:], bytes)
-	return uuid
+func MakeUUID(low uint64, high uint64) UUID {
+	return UUID{low, high}
 }
 
 var hexDigits = [...]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
-var rand *mrand.Rand
-var mask [16]byte
+var mask UUID
 
 func init() {
-	rand = mrand.New(mrand.NewSource(time.Now().UnixNano()))
+	var buffer [16]byte
 
-	if _, e := crand.Read(mask[:]); e != nil {
-		panic(e)
+	if _, err := crand.Read(buffer[:]); err != nil {
+		panic(err)
 	}
+
+	mask = UUID{binary.LittleEndian.Uint64(buffer[:8]), binary.LittleEndian.Uint64(buffer[8:])}
 }
