@@ -1,4 +1,4 @@
-package delay_pool
+package delaypool
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
+
+	"github.com/let-z-go/toolkit/utils"
 )
 
 type DelayPool struct {
@@ -21,25 +23,25 @@ func (self *DelayPool) Reset(values []interface{}, numberOfValues int, maxTotalD
 		values = self.values
 	}
 
-	if len(values) == 0 {
-		panic(fmt.Errorf("toolkit: delay pool reset: values=%#v", values))
-	}
+	utils.Assert(len(values) >= 1, func() string {
+		return fmt.Sprintf("toolkit/delaypool: invalid argument: values=%#v", values)
+	})
 
 	if numberOfValues < 1 {
 		numberOfValues = self.numberOfValues
 	}
 
-	if numberOfValues < 1 {
-		panic(fmt.Errorf("toolkit: delay pool reset: numberOfValues=%#v", numberOfValues))
-	}
+	utils.Assert(numberOfValues >= 1, func() string {
+		return fmt.Sprintf("toolkit/delaypool: invalid argument: numberOfValues=%#v", numberOfValues)
+	})
 
 	if maxTotalDelay < 1 {
 		maxTotalDelay = time.Duration(self.numberOfValues) * self.maxDelay
 	}
 
-	if maxTotalDelay < 1 {
-		panic(fmt.Errorf("toolkit: delay pool reset: maxTotalDelay=%#v", maxTotalDelay))
-	}
+	utils.Assert(maxTotalDelay >= 1, func() string {
+		return fmt.Sprintf("toolkit/delaypool: invalid argument: maxTotalDelay=%#v", maxTotalDelay)
+	})
 
 	random := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -54,7 +56,7 @@ func (self *DelayPool) Reset(values []interface{}, numberOfValues int, maxTotalD
 	self.usedValueCount = 0
 }
 
-func (self *DelayPool) GC() {
+func (self *DelayPool) Finalize() {
 	self.values = nil
 }
 
@@ -105,4 +107,4 @@ func (self *DelayPool) WhenNextValueUsable() time.Time {
 	return self.nextValueUsableTime
 }
 
-var NoMoreValuesError = errors.New("toolkit: no more values")
+var NoMoreValuesError = errors.New("toolkit/delaypool: no more values")

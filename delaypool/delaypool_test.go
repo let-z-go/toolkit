@@ -1,4 +1,4 @@
-package delay_pool
+package delaypool
 
 import (
 	"context"

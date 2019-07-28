@@ -45,7 +45,7 @@ func (self *Logger) Initialize(name string, severityLevel SeverityLevel, writer1
 	return self
 }
 
-func (self *Logger) GC() {
+func (self *Logger) Finalize() {
 	for i := range self.bases {
 		self.bases[i] = nil
 	}

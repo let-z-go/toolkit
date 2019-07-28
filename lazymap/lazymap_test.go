@@ -1,4 +1,4 @@
-package lazy_map
+package lazymap
 
 import (
 	"math/rand"

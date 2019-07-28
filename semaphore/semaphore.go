@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/let-z-go/toolkit/condition"
+	"github.com/let-z-go/toolkit/utils"
 )
 
 type Semaphore struct {
@@ -19,29 +20,24 @@ type Semaphore struct {
 	downWaiterCountX2 uint32
 	upCondition       condition.Condition
 	downCondition     condition.Condition
-	openness          int32
+	isClosed          int32
 }
 
 func (self *Semaphore) Initialize(minValue int32, maxValue int32, value int32) *Semaphore {
-	if self.openness != 0 {
-		panic(errors.New("toolkit: semaphore already initialized"))
-	}
-
-	if value < minValue || value > maxValue {
-		panic(fmt.Errorf("toolkit: semaphore initialization: minValue=%#v, maxValue=%#v, value=%#v", minValue, maxValue, value))
-	}
+	utils.Assert(value >= minValue && value <= maxValue, func() string {
+		return fmt.Sprintf("toolkit/semaphore: invalid argument: value=%#v, minValue=%#v, maxValue=%#v", value, minValue, maxValue)
+	})
 
 	self.minValue = minValue
 	self.maxValue = maxValue
 	self.value = value
 	self.upCondition.Initialize(&self.lock)
 	self.downCondition.Initialize(&self.lock)
-	self.openness = 1
 	return self
 }
 
 func (self *Semaphore) Close(callback func()) error {
-	if !atomic.CompareAndSwapInt32(&self.openness, 1, -1) {
+	if !atomic.CompareAndSwapInt32(&self.isClosed, 0, 1) {
 		return SemaphoreClosedError
 	}
 
@@ -142,7 +138,7 @@ func (self *Semaphore) DecreaseMinValue(decrement int32, decreaseValue bool, cal
 }
 
 func (self *Semaphore) IsClosed() bool {
-	return atomic.LoadInt32(&self.openness) != 1
+	return atomic.LoadInt32(&self.isClosed) == 1
 }
 
 func (self *Semaphore) doUp(context_ context.Context, maximizeIncrement bool, increaseMinValue bool, callback func()) (int32, error) {
@@ -311,4 +307,4 @@ func (self *Semaphore) notifyDownWaiter() {
 	}
 }
 
-var SemaphoreClosedError = errors.New("toolkit: semaphore closed")
+var SemaphoreClosedError = errors.New("toolkit/semaphore: semaphore closed")

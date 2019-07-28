@@ -2,11 +2,10 @@ package condition
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"unsafe"
 
-	"github.com/let-z-go/intrusive_containers/list"
+	"github.com/let-z-go/intrusives/list"
 )
 
 type Condition struct {
@@ -15,19 +14,14 @@ type Condition struct {
 }
 
 func (self *Condition) Initialize(lock sync.Locker) *Condition {
-	if self.lock != nil {
-		panic(errors.New("toolkit: condition already initialized"))
-	}
-
 	self.lock = lock
 	self.listOfWaiters.Initialize()
 	return self
 }
 
 func (self *Condition) WaitFor(context_ context.Context) (bool, error) {
-	self.checkUninitialized()
 	var waiter conditionWaiter
-	waiter.Event = make(chan struct{}, 1)
+	waiter.Event = make(chan struct{})
 	self.listOfWaiters.AppendNode(&waiter.ListNode)
 	self.lock.Unlock()
 	var e error
@@ -50,8 +44,6 @@ func (self *Condition) WaitFor(context_ context.Context) (bool, error) {
 }
 
 func (self *Condition) Signal() {
-	self.checkUninitialized()
-
 	if self.listOfWaiters.IsEmpty() {
 		return
 	}
@@ -59,26 +51,19 @@ func (self *Condition) Signal() {
 	waiter := (*conditionWaiter)(self.listOfWaiters.GetHead().GetContainer(unsafe.Offsetof(conditionWaiter{}.ListNode)))
 	waiter.ListNode.Remove()
 	waiter.ListNode.Reset()
-	waiter.Event <- struct{}{}
+	close(waiter.Event)
 }
 
 func (self *Condition) Broadcast() {
-	self.checkUninitialized()
 	getNode := self.listOfWaiters.GetNodesSafely()
 
 	for listNode := getNode(); listNode != nil; listNode = getNode() {
 		listNode.Reset()
 		waiter := (*conditionWaiter)(listNode.GetContainer(unsafe.Offsetof(conditionWaiter{}.ListNode)))
-		waiter.Event <- struct{}{}
+		close(waiter.Event)
 	}
 
 	self.listOfWaiters.Initialize()
-}
-
-func (self *Condition) checkUninitialized() {
-	if self.lock == nil {
-		panic(errors.New("toolkit: condition uninitialized"))
-	}
 }
 
 type conditionWaiter struct {

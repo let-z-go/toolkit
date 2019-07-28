@@ -1,4 +1,4 @@
-package byte_stream
+package bytestream
 
 import (
 	"github.com/let-z-go/toolkit/utils"
@@ -10,7 +10,7 @@ type ByteStream struct {
 	bufferOffset int
 }
 
-func (self *ByteStream) GC() {
+func (self *ByteStream) Finalize() {
 	self.base = nil
 }
 

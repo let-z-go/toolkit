@@ -3,7 +3,7 @@ package deque
 import (
 	"context"
 
-	"github.com/let-z-go/intrusive_containers/list"
+	"github.com/let-z-go/intrusives/list"
 	"github.com/let-z-go/toolkit/semaphore"
 )
 

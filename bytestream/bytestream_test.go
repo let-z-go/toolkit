@@ -1,4 +1,4 @@
-package byte_stream
+package bytestream
 
 import (
 	"bytes"

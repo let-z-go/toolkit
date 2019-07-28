@@ -1,4 +1,4 @@
-package lazy_map
+package lazymap
 
 import (
 	"sync"
@@ -8,7 +8,7 @@ type LazyMap struct {
 	base sync.Map
 }
 
-func (self *LazyMap) GetOrSetValue(key interface{}, valueMaker func() (interface{}, error)) (interface{}, func(), error) {
+func (self *LazyMap) GetOrSetValue(key interface{}, valueFactory func() (interface{}, error)) (interface{}, func(), error) {
 retry:
 	value, _ := self.base.LoadOrStore(key, &lock{})
 	valueClearer := (func())(nil)
@@ -31,7 +31,7 @@ retry:
 			}
 
 			var e error
-			value2, e = valueMaker()
+			value2, e = valueFactory()
 
 			if e != nil {
 				lock_.Unlock()
@@ -39,7 +39,7 @@ retry:
 			}
 
 			self.base.Store(key, value2)
-			var once sync.Once
+			once := sync.Once{}
 
 			valueClearer = func() {
 				once.Do(func() {
