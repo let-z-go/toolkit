@@ -3,14 +3,20 @@ package connection
 import (
 	"context"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/let-z-go/toolkit/utils"
 )
 
 type Connection struct {
-	raw     net.Conn
-	preRWCs chan *connectionPreRWC
+	raw                     net.Conn
+	preReading              chan struct{}
+	preWriting              chan struct{}
+	lockOfPreReading        sync.Mutex
+	lockOfPreWriting        sync.Mutex
+	latestReadCancellation  <-chan struct{}
+	latestWriteCancellation <-chan struct{}
 }
 
 func (self *Connection) Init(raw net.Conn) *Connection {
@@ -19,46 +25,48 @@ func (self *Connection) Init(raw net.Conn) *Connection {
 	})
 
 	self.raw = raw
-	self.preRWCs = make(chan *connectionPreRWC, 2)
+	self.preReading = make(chan struct{}, 1)
+	self.preWriting = make(chan struct{}, 1)
 
 	go func() {
 		readCancellation := noCancellation
-		readDeadline := time.Time{}
 		writeCancellation := noCancellation
-		writeDeadline := time.Time{}
 
 		for {
 			select {
-			case preRWC := <-self.preRWCs:
-				switch preRWC.type_ {
-				case 'R':
-					if !preRWC.deadline.Equal(readDeadline) {
-						readDeadline = preRWC.deadline
-						self.raw.SetReadDeadline(readDeadline)
-					}
-
-					readCancellation = preRWC.cancellation
-					close(preRWC.completion)
-				case 'W':
-					if !preRWC.deadline.Equal(writeDeadline) {
-						writeDeadline = preRWC.deadline
-						self.raw.SetWriteDeadline(writeDeadline)
-					}
-
-					writeCancellation = preRWC.cancellation
-					close(preRWC.completion)
-				default: // case 'C':
-					close(self.preRWCs)
-					close(preRWC.completion)
+			case _, ok := <-self.preReading:
+				if !ok {
 					return
 				}
+
+				self.lockOfPreReading.Lock()
+				readCancellation = self.latestReadCancellation
+				self.lockOfPreReading.Unlock()
+			case _, ok := <-self.preWriting:
+				if !ok {
+					return
+				}
+
+				self.lockOfPreWriting.Lock()
+				writeCancellation = self.latestWriteCancellation
+				self.lockOfPreWriting.Unlock()
 			case <-readCancellation:
-				readDeadline = time.Now()
-				self.raw.SetReadDeadline(readDeadline)
+				self.lockOfPreReading.Lock()
+
+				if readCancellation == self.latestReadCancellation {
+					raw.SetReadDeadline(time.Now())
+				}
+
+				self.lockOfPreReading.Unlock()
 				readCancellation = noCancellation
 			case <-writeCancellation:
-				writeDeadline = time.Now()
-				self.raw.SetWriteDeadline(writeDeadline)
+				self.lockOfPreWriting.Lock()
+
+				if writeCancellation == self.latestWriteCancellation {
+					raw.SetWriteDeadline(time.Now())
+				}
+
+				self.lockOfPreWriting.Unlock()
 				writeCancellation = noCancellation
 			}
 		}
@@ -68,9 +76,8 @@ func (self *Connection) Init(raw net.Conn) *Connection {
 }
 
 func (self *Connection) Close() error {
-	completion := make(chan struct{})
-	self.preRWCs <- &connectionPreRWC{'C', nil, time.Time{}, completion}
-	<-completion
+	close(self.preReading)
+	close(self.preWriting)
 	raw := self.raw
 	self.raw = nil
 	return raw.Close()
@@ -82,9 +89,15 @@ func (self *Connection) Read(ctx context.Context, deadline time.Time, buffer []b
 }
 
 func (self *Connection) PreRead(ctx context.Context, deadline time.Time) {
-	completion := make(chan struct{})
-	self.preRWCs <- &connectionPreRWC{'R', ctx.Done(), deadline, completion}
-	<-completion
+	self.lockOfPreReading.Lock()
+	self.latestReadCancellation = ctx.Done()
+	self.raw.SetReadDeadline(deadline)
+	self.lockOfPreReading.Unlock()
+
+	select {
+	case self.preReading <- struct{}{}:
+	default:
+	}
 }
 
 func (self *Connection) DoRead(ctx context.Context, buffer []byte) (int, error) {
@@ -105,9 +118,15 @@ func (self *Connection) Write(ctx context.Context, deadline time.Time, data []by
 }
 
 func (self *Connection) PreWrite(ctx context.Context, deadline time.Time) {
-	completion := make(chan struct{})
-	self.preRWCs <- &connectionPreRWC{'W', ctx.Done(), deadline, completion}
-	<-completion
+	self.lockOfPreWriting.Lock()
+	self.latestWriteCancellation = ctx.Done()
+	self.raw.SetWriteDeadline(deadline)
+	self.lockOfPreWriting.Unlock()
+
+	select {
+	case self.preWriting <- struct{}{}:
+	default:
+	}
 }
 
 func (self *Connection) DoWrite(ctx context.Context, data []byte) (int, error) {
@@ -124,13 +143,6 @@ func (self *Connection) DoWrite(ctx context.Context, data []byte) (int, error) {
 
 func (self *Connection) IsClosed() bool {
 	return self.raw == nil
-}
-
-type connectionPreRWC struct {
-	type_        byte
-	cancellation <-chan struct{}
-	deadline     time.Time
-	completion   chan<- struct{}
 }
 
 var noCancellation = make(<-chan struct{})
