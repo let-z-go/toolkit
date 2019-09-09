@@ -10,13 +10,13 @@ import (
 )
 
 type Connection struct {
-	raw                     net.Conn
-	preReading              chan struct{}
-	preWriting              chan struct{}
-	lockOfPreReading        sync.Mutex
-	lockOfPreWriting        sync.Mutex
-	latestReadCancellation  <-chan struct{}
-	latestWriteCancellation <-chan struct{}
+	raw              net.Conn
+	preReading       chan struct{}
+	preWriting       chan struct{}
+	lockOfPreReading sync.Mutex
+	lockOfPreWriting sync.Mutex
+	latestReadCtx    context.Context
+	latestWriteCtx   context.Context
 }
 
 func (self *Connection) Init(raw net.Conn) *Connection {
@@ -29,8 +29,8 @@ func (self *Connection) Init(raw net.Conn) *Connection {
 	self.preWriting = make(chan struct{}, 1)
 
 	go func() {
-		readCancellation := noCancellation
-		writeCancellation := noCancellation
+		readCtx := context.Background()
+		writeCtx := context.Background()
 
 		for {
 			select {
@@ -40,7 +40,7 @@ func (self *Connection) Init(raw net.Conn) *Connection {
 				}
 
 				self.lockOfPreReading.Lock()
-				readCancellation = self.latestReadCancellation
+				readCtx = self.latestReadCtx
 				self.lockOfPreReading.Unlock()
 			case _, ok := <-self.preWriting:
 				if !ok {
@@ -48,26 +48,26 @@ func (self *Connection) Init(raw net.Conn) *Connection {
 				}
 
 				self.lockOfPreWriting.Lock()
-				writeCancellation = self.latestWriteCancellation
+				writeCtx = self.latestWriteCtx
 				self.lockOfPreWriting.Unlock()
-			case <-readCancellation:
+			case <-readCtx.Done():
 				self.lockOfPreReading.Lock()
 
-				if readCancellation == self.latestReadCancellation {
+				if readCtx == self.latestReadCtx {
 					raw.SetReadDeadline(time.Now())
 				}
 
 				self.lockOfPreReading.Unlock()
-				readCancellation = noCancellation
-			case <-writeCancellation:
+				readCtx = context.Background()
+			case <-writeCtx.Done():
 				self.lockOfPreWriting.Lock()
 
-				if writeCancellation == self.latestWriteCancellation {
+				if writeCtx == self.latestWriteCtx {
 					raw.SetWriteDeadline(time.Now())
 				}
 
 				self.lockOfPreWriting.Unlock()
-				writeCancellation = noCancellation
+				writeCtx = context.Background()
 			}
 		}
 	}()
@@ -90,7 +90,7 @@ func (self *Connection) Read(ctx context.Context, deadline time.Time, buffer []b
 
 func (self *Connection) PreRead(ctx context.Context, deadline time.Time) {
 	self.lockOfPreReading.Lock()
-	self.latestReadCancellation = ctx.Done()
+	self.latestReadCtx = ctx
 	self.raw.SetReadDeadline(deadline)
 	self.lockOfPreReading.Unlock()
 
@@ -119,7 +119,7 @@ func (self *Connection) Write(ctx context.Context, deadline time.Time, data []by
 
 func (self *Connection) PreWrite(ctx context.Context, deadline time.Time) {
 	self.lockOfPreWriting.Lock()
-	self.latestWriteCancellation = ctx.Done()
+	self.latestWriteCtx = ctx
 	self.raw.SetWriteDeadline(deadline)
 	self.lockOfPreWriting.Unlock()
 
@@ -144,5 +144,3 @@ func (self *Connection) DoWrite(ctx context.Context, data []byte) (int, error) {
 func (self *Connection) IsClosed() bool {
 	return self.raw == nil
 }
-
-var noCancellation = make(<-chan struct{})
