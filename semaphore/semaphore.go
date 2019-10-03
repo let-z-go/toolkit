@@ -137,29 +137,29 @@ func (self *Semaphore) DecreaseMinValue(decrement int, decreaseValue bool, callb
 	return nil
 }
 
-func (self *Semaphore) GetMinValue() int {
+func (self *Semaphore) IsClosed() bool {
+	return atomic.LoadInt32(&self.isClosed) == 1
+}
+
+func (self *Semaphore) MinValue() int {
 	self.lock.Lock()
 	minValue := self.minValue
 	self.lock.Unlock()
 	return minValue
 }
 
-func (self *Semaphore) GetMaxValue() int {
+func (self *Semaphore) MaxValue() int {
 	self.lock.Lock()
 	maxValue := self.maxValue
 	self.lock.Unlock()
 	return maxValue
 }
 
-func (self *Semaphore) GetValue() int {
+func (self *Semaphore) Value() int {
 	self.lock.Lock()
 	value := self.value
 	self.lock.Unlock()
 	return value
-}
-
-func (self *Semaphore) IsClosed() bool {
-	return atomic.LoadInt32(&self.isClosed) == 1
 }
 
 func (self *Semaphore) doUp(ctx context.Context, maximizeIncrement bool, increaseMinValue bool, callback func()) (int, error) {

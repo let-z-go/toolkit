@@ -14,8 +14,8 @@ type Deque struct {
 	list      list.List
 }
 
-func (self *Deque) Init(maxNumberOfNodes int) *Deque {
-	self.semaphore.Init(0, maxNumberOfNodes, 0)
+func (self *Deque) Init(maxLength int) *Deque {
+	self.semaphore.Init(0, maxLength, 0)
 	self.list.Init()
 	return self
 }
@@ -48,8 +48,7 @@ func (self *Deque) RemoveTail(ctx context.Context, withoutCommitment bool) (*lis
 	node := (*list.ListNode)(nil)
 
 	return node, convertSemaphoreError(self.semaphore.Down(ctx, withoutCommitment, func() {
-		node = self.list.GetTail()
-		node.Remove()
+		self.list.Tail().Remove()
 	}))
 }
 
@@ -57,8 +56,7 @@ func (self *Deque) RemoveHead(ctx context.Context, withoutCommitment bool) (*lis
 	node := (*list.ListNode)(nil)
 
 	return node, convertSemaphoreError(self.semaphore.Down(ctx, withoutCommitment, func() {
-		node = self.list.GetHead()
-		node.Remove()
+		self.list.Head().Remove()
 	}))
 }
 
@@ -98,16 +96,16 @@ func (self *Deque) DiscardNodesRemoval(list_ *list.List, numberOfNodes int, appe
 	}))
 }
 
-func (self *Deque) GetMaxLength() int {
-	return self.semaphore.GetMaxValue()
-}
-
-func (self *Deque) GetLength() int {
-	return self.semaphore.GetValue()
-}
-
 func (self *Deque) IsClosed() bool {
 	return self.semaphore.IsClosed()
+}
+
+func (self *Deque) MaxLength() int {
+	return self.semaphore.MaxValue()
+}
+
+func (self *Deque) Length() int {
+	return self.semaphore.Value()
 }
 
 var ErrDequeClosed = errors.New("toolkit/deque: deque closed")

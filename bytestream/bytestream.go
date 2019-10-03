@@ -54,10 +54,8 @@ func (self *ByteStream) Unwrite(dataSize int) int {
 
 	self.bufferOffset -= dataSize
 
-	if self.bufferOffset < 2*self.dataOffset {
-		copy(self.base, self.GetData())
-		self.bufferOffset -= self.dataOffset
-		self.dataOffset = 0
+	if self.dataOffset >= self.bufferOffset/2 {
+		self.setData(self.GetData())
 	}
 
 	return dataSize
@@ -66,20 +64,21 @@ func (self *ByteStream) Unwrite(dataSize int) int {
 func (self *ByteStream) ReserveBuffer(bufferSize int) {
 	bufferSize = int(utils.MaxOfZero(int64(bufferSize)))
 
-	if bufferSize < self.GetBufferSize() {
+	if self.GetBufferSize() >= bufferSize {
 		return
 	}
 
 	data := self.GetData()
 
-	if bufferSize > len(self.base)-len(data) || 2*len(data) > len(self.base) {
-		newBaseSize := int(utils.NextPowerOfTwo(int64(self.bufferOffset + bufferSize)))
-		self.base = make([]byte, newBaseSize)
+	if len(self.base)-len(data) < bufferSize {
+		self.base = make([]byte, int(utils.NextPowerOfTwo(int64(len(data)+bufferSize))))
+	} else {
+		if len(data) > len(self.base)/2 {
+			self.base = make([]byte, 2*len(self.base))
+		}
 	}
 
-	copy(self.base, data)
-	self.dataOffset = 0
-	self.bufferOffset = len(data)
+	self.setData(data)
 }
 
 func (self *ByteStream) CommitBuffer(bufferSize int) int {
@@ -93,8 +92,28 @@ func (self *ByteStream) CommitBuffer(bufferSize int) int {
 	return bufferSize
 }
 
-func (self *ByteStream) GetSize() int {
-	return len(self.base)
+func (self *ByteStream) Expand() {
+	data := self.GetData()
+	newSize := len(self.base) * 2
+	self.base = make([]byte, newSize)
+	self.setData(data)
+}
+
+func (self *ByteStream) Shrink(minSize int) {
+	data := self.GetData()
+
+	if minSize < len(data) {
+		minSize = len(data)
+	}
+
+	minSize = int(utils.NextPowerOfTwo(int64(minSize)))
+
+	if len(self.base) == minSize {
+		return
+	}
+
+	self.base = make([]byte, minSize)
+	self.setData(data)
 }
 
 func (self *ByteStream) GetData() []byte {
@@ -103,7 +122,6 @@ func (self *ByteStream) GetData() []byte {
 
 func (self *ByteStream) GetDataSize() int {
 	return self.bufferOffset - self.dataOffset
-
 }
 
 func (self *ByteStream) GetBuffer() []byte {
@@ -114,14 +132,22 @@ func (self *ByteStream) GetBufferSize() int {
 	return len(self.base) - self.bufferOffset
 }
 
+func (self *ByteStream) Size() int {
+	return len(self.base)
+}
+
 func (self *ByteStream) doSkip(dataSize int) {
 	self.dataOffset += dataSize
 
-	if 2*self.dataOffset > self.bufferOffset {
-		copy(self.base, self.GetData())
-		self.bufferOffset -= self.dataOffset
-		self.dataOffset = 0
+	if self.dataOffset >= self.bufferOffset/2 {
+		self.setData(self.GetData())
 	}
+}
+
+func (self *ByteStream) setData(data []byte) {
+	copy(self.base, data)
+	self.dataOffset = 0
+	self.bufferOffset = len(data)
 }
 
 func (self *ByteStream) doCommitBuffer(bufferSize int) {

@@ -48,7 +48,7 @@ func (self *Condition) Signal() {
 		return
 	}
 
-	waiter := (*conditionWaiter)(self.listOfWaiters.GetHead().GetContainer(unsafe.Offsetof(conditionWaiter{}.ListNode)))
+	waiter := (*conditionWaiter)(self.listOfWaiters.Head().GetContainer(unsafe.Offsetof(conditionWaiter{}.ListNode)))
 	waiter.ListNode.Remove()
 	waiter.ListNode.Reset()
 	close(waiter.Event)
