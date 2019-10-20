@@ -10,7 +10,7 @@ import (
 )
 
 type Connection struct {
-	raw              net.Conn
+	underlying       net.Conn
 	preReading       chan struct{}
 	preWriting       chan struct{}
 	lockOfPreReading sync.Mutex
@@ -19,12 +19,12 @@ type Connection struct {
 	latestWriteCtx   context.Context
 }
 
-func (self *Connection) Init(raw net.Conn) *Connection {
-	utils.Assert(raw != nil, func() string {
-		return "toolkit/connection: invalid argument: raw is nil"
+func (self *Connection) Init(underlying net.Conn) *Connection {
+	utils.Assert(underlying != nil, func() string {
+		return "toolkit/connection: invalid argument: underlying is nil"
 	})
 
-	self.raw = raw
+	self.underlying = underlying
 	self.preReading = make(chan struct{}, 1)
 	self.preWriting = make(chan struct{}, 1)
 
@@ -54,7 +54,7 @@ func (self *Connection) Init(raw net.Conn) *Connection {
 				self.lockOfPreReading.Lock()
 
 				if readCtx == self.latestReadCtx {
-					raw.SetReadDeadline(time.Now())
+					underlying.SetReadDeadline(time.Now())
 				}
 
 				self.lockOfPreReading.Unlock()
@@ -63,7 +63,7 @@ func (self *Connection) Init(raw net.Conn) *Connection {
 				self.lockOfPreWriting.Lock()
 
 				if writeCtx == self.latestWriteCtx {
-					raw.SetWriteDeadline(time.Now())
+					underlying.SetWriteDeadline(time.Now())
 				}
 
 				self.lockOfPreWriting.Unlock()
@@ -78,9 +78,9 @@ func (self *Connection) Init(raw net.Conn) *Connection {
 func (self *Connection) Close() error {
 	close(self.preReading)
 	close(self.preWriting)
-	raw := self.raw
-	self.raw = nil
-	return raw.Close()
+	underlying := self.underlying
+	self.underlying = nil
+	return underlying.Close()
 }
 
 func (self *Connection) Read(ctx context.Context, deadline time.Time, buffer []byte) (int, error) {
@@ -91,7 +91,7 @@ func (self *Connection) Read(ctx context.Context, deadline time.Time, buffer []b
 func (self *Connection) PreRead(ctx context.Context, deadline time.Time) {
 	self.lockOfPreReading.Lock()
 	self.latestReadCtx = ctx
-	self.raw.SetReadDeadline(deadline)
+	self.underlying.SetReadDeadline(deadline)
 	self.lockOfPreReading.Unlock()
 
 	select {
@@ -101,7 +101,7 @@ func (self *Connection) PreRead(ctx context.Context, deadline time.Time) {
 }
 
 func (self *Connection) DoRead(ctx context.Context, buffer []byte) (int, error) {
-	n, err := self.raw.Read(buffer)
+	n, err := self.underlying.Read(buffer)
 
 	if err != nil {
 		if err2 := ctx.Err(); err2 != nil {
@@ -120,7 +120,7 @@ func (self *Connection) Write(ctx context.Context, deadline time.Time, data []by
 func (self *Connection) PreWrite(ctx context.Context, deadline time.Time) {
 	self.lockOfPreWriting.Lock()
 	self.latestWriteCtx = ctx
-	self.raw.SetWriteDeadline(deadline)
+	self.underlying.SetWriteDeadline(deadline)
 	self.lockOfPreWriting.Unlock()
 
 	select {
@@ -130,7 +130,7 @@ func (self *Connection) PreWrite(ctx context.Context, deadline time.Time) {
 }
 
 func (self *Connection) DoWrite(ctx context.Context, data []byte) (int, error) {
-	n, err := self.raw.Write(data)
+	n, err := self.underlying.Write(data)
 
 	if err != nil {
 		if err2 := ctx.Err(); err2 != nil {
@@ -142,5 +142,5 @@ func (self *Connection) DoWrite(ctx context.Context, data []byte) (int, error) {
 }
 
 func (self *Connection) IsClosed() bool {
-	return self.raw == nil
+	return self.underlying == nil
 }
