@@ -1,6 +1,7 @@
 package lazymap
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -18,7 +19,7 @@ func TestLazyMap(t *testing.T) {
 		wg.Add(1)
 
 		go func(i int) {
-			v, vc, _ := lm.GetOrSetValue("k", func() (interface{}, error) {
+			v, vc, _ := lm.GetOrSetValue(context.Background(), "k", func(context.Context) (interface{}, error) {
 				time.Sleep(time.Second / 100)
 				return "v", nil
 			})

@@ -8,18 +8,18 @@ import (
 
 type UUID [2]uint64
 
-func (self UUID) IsZero() bool {
-	return (self[0] | self[1]) == 0
+func (u UUID) IsZero() bool {
+	return (u[0] | u[1]) == 0
 }
 
-func (self UUID) String() string {
+func (u UUID) String() string {
 	i := uint(0)
 	buffer := make([]byte, 37)
 	j := 0
 
 	for _, k := range [...]uint{32, 48, 64, 80, 128} {
 		for ; i < k; i += 16 {
-			x := (self[i/64] >> (i % 64)) & 0xFFFF
+			x := (u[i/64] >> (i % 64)) & 0xFFFF
 			buffer[j] = hexDigits[(x>>4)&0xF]
 			buffer[j+1] = hexDigits[x&0xF]
 			buffer[j+2] = hexDigits[x>>12]

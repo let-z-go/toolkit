@@ -4,108 +4,110 @@ import (
 	"context"
 	"errors"
 
-	"github.com/let-z-go/intrusives/list"
+	"github.com/let-z-go/intrusive"
 
 	"github.com/let-z-go/toolkit/semaphore"
 )
 
 type Deque struct {
 	semaphore semaphore.Semaphore
-	list      list.List
+	list      intrusive.List
 }
 
-func (self *Deque) Init(maxLength int) *Deque {
-	self.semaphore.Init(0, maxLength, 0)
-	self.list.Init()
-	return self
+func (d *Deque) Init(maxLength int) *Deque {
+	d.semaphore.Init(0, maxLength, 0)
+	d.list.Init()
+	return d
 }
 
-func (self *Deque) Close(list_ *list.List) (int, error) {
-	n, err := self.semaphore.Close(func() {
-		if list_ == nil {
-			self.list.Init()
+func (d *Deque) Close(list *intrusive.List) (int, error) {
+	n, err := d.semaphore.Close(func() {
+		if list == nil {
+			d.list.Init()
 		} else {
-			list_.AppendNodes(&self.list)
+			list.AppendNodes(&d.list)
 		}
 	})
 
 	return n, convertSemaphoreError(err)
 }
 
-func (self *Deque) AppendNode(ctx context.Context, node *list.ListNode) error {
-	return convertSemaphoreError(self.semaphore.Up(ctx, false, func() {
-		self.list.AppendNode(node)
+func (d *Deque) AppendNode(ctx context.Context, node *intrusive.ListNode) error {
+	return convertSemaphoreError(d.semaphore.Up(ctx, false, func() {
+		d.list.AppendNode(node)
 	}))
 }
 
-func (self *Deque) PrependNode(ctx context.Context, node *list.ListNode) error {
-	return convertSemaphoreError(self.semaphore.Up(ctx, false, func() {
-		self.list.PrependNode(node)
+func (d *Deque) PrependNode(ctx context.Context, node *intrusive.ListNode) error {
+	return convertSemaphoreError(d.semaphore.Up(ctx, false, func() {
+		d.list.PrependNode(node)
 	}))
 }
 
-func (self *Deque) RemoveTail(ctx context.Context, withoutCommitment bool) (*list.ListNode, error) {
-	node := (*list.ListNode)(nil)
+func (d *Deque) RemoveTail(ctx context.Context, withoutCommitment bool) (*intrusive.ListNode, error) {
+	node := (*intrusive.ListNode)(nil)
 
-	return node, convertSemaphoreError(self.semaphore.Down(ctx, withoutCommitment, func() {
-		self.list.Tail().Remove()
+	return node, convertSemaphoreError(d.semaphore.Down(ctx, withoutCommitment, func() {
+		node = d.list.Tail()
+		node.Remove()
 	}))
 }
 
-func (self *Deque) RemoveHead(ctx context.Context, withoutCommitment bool) (*list.ListNode, error) {
-	node := (*list.ListNode)(nil)
+func (d *Deque) RemoveHead(ctx context.Context, withoutCommitment bool) (*intrusive.ListNode, error) {
+	node := (*intrusive.ListNode)(nil)
 
-	return node, convertSemaphoreError(self.semaphore.Down(ctx, withoutCommitment, func() {
-		self.list.Head().Remove()
+	return node, convertSemaphoreError(d.semaphore.Down(ctx, withoutCommitment, func() {
+		node = d.list.Head()
+		node.Remove()
 	}))
 }
 
-func (self *Deque) CommitNodeRemoval() error {
-	return convertSemaphoreError(self.semaphore.IncreaseMaxValue(1, false, nil))
+func (d *Deque) CommitNodeRemoval() error {
+	return convertSemaphoreError(d.semaphore.IncreaseMaxValue(1, false, nil))
 }
 
-func (self *Deque) DiscardNodeRemoval(node *list.ListNode, appendNode bool) error {
-	return convertSemaphoreError(self.semaphore.IncreaseMaxValue(1, true, func() {
+func (d *Deque) DiscardNodeRemoval(node *intrusive.ListNode, appendNode bool) error {
+	return convertSemaphoreError(d.semaphore.IncreaseMaxValue(1, true, func() {
 		if appendNode {
-			self.list.AppendNode(node)
+			d.list.AppendNode(node)
 		} else {
-			self.list.PrependNode(node)
+			d.list.PrependNode(node)
 		}
 	}))
 }
 
-func (self *Deque) RemoveNodes(ctx context.Context, withoutCommitment bool, list_ *list.List) (int, error) {
-	n, err := self.semaphore.DownAll(ctx, withoutCommitment, func() {
-		list_.AppendNodes(&self.list)
+func (d *Deque) RemoveNodes(ctx context.Context, withoutCommitment bool, list *intrusive.List) (int, error) {
+	n, err := d.semaphore.DownAll(ctx, withoutCommitment, func() {
+		list.AppendNodes(&d.list)
 	})
 
 	return n, convertSemaphoreError(err)
 }
 
-func (self *Deque) CommitNodesRemoval(numberOfNodes int) error {
-	return convertSemaphoreError(self.semaphore.IncreaseMaxValue(numberOfNodes, false, nil))
+func (d *Deque) CommitNodesRemoval(numberOfNodes int) error {
+	return convertSemaphoreError(d.semaphore.IncreaseMaxValue(numberOfNodes, false, nil))
 }
 
-func (self *Deque) DiscardNodesRemoval(list_ *list.List, numberOfNodes int, appendNodes bool) error {
-	return convertSemaphoreError(self.semaphore.IncreaseMaxValue(numberOfNodes, true, func() {
+func (d *Deque) DiscardNodesRemoval(list *intrusive.List, numberOfNodes int, appendNodes bool) error {
+	return convertSemaphoreError(d.semaphore.IncreaseMaxValue(numberOfNodes, true, func() {
 		if appendNodes {
-			self.list.AppendNodes(list_)
+			d.list.AppendNodes(list)
 		} else {
-			self.list.PrependNodes(list_)
+			d.list.PrependNodes(list)
 		}
 	}))
 }
 
-func (self *Deque) IsClosed() bool {
-	return self.semaphore.IsClosed()
+func (d *Deque) IsClosed() bool {
+	return d.semaphore.IsClosed()
 }
 
-func (self *Deque) MaxLength() int {
-	return self.semaphore.MaxValue()
+func (d *Deque) MaxLength() int {
+	return d.semaphore.MaxValue()
 }
 
-func (self *Deque) Length() int {
-	return self.semaphore.Value()
+func (d *Deque) Length() int {
+	return d.semaphore.Value()
 }
 
 var ErrDequeClosed = errors.New("toolkit/deque: deque closed")

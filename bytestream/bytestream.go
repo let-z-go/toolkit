@@ -10,97 +10,97 @@ type ByteStream struct {
 	bufferOffset int
 }
 
-func (self *ByteStream) Read(buffer []byte) int {
-	dataSize := copy(buffer, self.GetData())
-	self.doSkip(dataSize)
+func (bs *ByteStream) Read(buffer []byte) int {
+	dataSize := copy(buffer, bs.GetData())
+	bs.doSkip(dataSize)
 	return dataSize
 }
 
-func (self *ByteStream) Skip(dataSize int) int {
+func (bs *ByteStream) Skip(dataSize int) int {
 	dataSize = int(utils.MaxOfZero(int64(dataSize)))
 
-	if maxDataSize := self.GetDataSize(); dataSize > maxDataSize {
+	if maxDataSize := bs.GetDataSize(); dataSize > maxDataSize {
 		dataSize = maxDataSize
 	}
 
-	self.doSkip(dataSize)
+	bs.doSkip(dataSize)
 	return dataSize
 }
 
-func (self *ByteStream) Write(data []byte) {
-	self.ReserveBuffer(len(data))
-	copy(self.GetBuffer(), data)
-	self.doCommitBuffer(len(data))
+func (bs *ByteStream) Write(data []byte) {
+	bs.ReserveBuffer(len(data))
+	copy(bs.GetBuffer(), data)
+	bs.doCommitBuffer(len(data))
 }
 
-func (self *ByteStream) WriteDirectly(bufferSize int, callback func([]byte) error) error {
+func (bs *ByteStream) WriteDirectly(bufferSize int, callback func([]byte) error) error {
 	bufferSize = int(utils.MaxOfZero(int64(bufferSize)))
-	self.ReserveBuffer(bufferSize)
+	bs.ReserveBuffer(bufferSize)
 
-	if err := callback(self.GetBuffer()); err != nil {
+	if err := callback(bs.GetBuffer()); err != nil {
 		return err
 	}
 
-	self.doCommitBuffer(bufferSize)
+	bs.doCommitBuffer(bufferSize)
 	return nil
 }
 
-func (self *ByteStream) Unwrite(dataSize int) int {
+func (bs *ByteStream) Unwrite(dataSize int) int {
 	dataSize = int(utils.MaxOfZero(int64(dataSize)))
 
-	if maxDataSize := self.GetDataSize(); dataSize > maxDataSize {
+	if maxDataSize := bs.GetDataSize(); dataSize > maxDataSize {
 		dataSize = maxDataSize
 	}
 
-	self.bufferOffset -= dataSize
+	bs.bufferOffset -= dataSize
 
-	if self.dataOffset >= self.bufferOffset/2 {
-		self.setData(self.GetData())
+	if bs.dataOffset*2 >= bs.bufferOffset {
+		bs.setData(bs.GetData())
 	}
 
 	return dataSize
 }
 
-func (self *ByteStream) ReserveBuffer(bufferSize int) {
+func (bs *ByteStream) ReserveBuffer(bufferSize int) {
 	bufferSize = int(utils.MaxOfZero(int64(bufferSize)))
 
-	if self.GetBufferSize() >= bufferSize {
+	if bs.GetBufferSize() >= bufferSize {
 		return
 	}
 
-	data := self.GetData()
+	data := bs.GetData()
 
-	if len(self.base)-len(data) < bufferSize {
-		self.base = make([]byte, int(utils.NextPowerOfTwo(int64(len(data)+bufferSize))))
+	if len(bs.base)-len(data) < bufferSize {
+		bs.base = make([]byte, int(utils.NextPowerOfTwo(int64(len(data)+bufferSize))))
 	} else {
-		if len(data) > len(self.base)/2 {
-			self.base = make([]byte, 2*len(self.base))
+		if len(data)*2 > len(bs.base) {
+			bs.base = make([]byte, 2*len(bs.base))
 		}
 	}
 
-	self.setData(data)
+	bs.setData(data)
 }
 
-func (self *ByteStream) CommitBuffer(bufferSize int) int {
+func (bs *ByteStream) CommitBuffer(bufferSize int) int {
 	bufferSize = int(utils.MaxOfZero(int64(bufferSize)))
 
-	if maxBufferSize := self.GetBufferSize(); bufferSize > maxBufferSize {
+	if maxBufferSize := bs.GetBufferSize(); bufferSize > maxBufferSize {
 		bufferSize = maxBufferSize
 	}
 
-	self.doCommitBuffer(bufferSize)
+	bs.doCommitBuffer(bufferSize)
 	return bufferSize
 }
 
-func (self *ByteStream) Expand() {
-	data := self.GetData()
-	newSize := len(self.base) * 2
-	self.base = make([]byte, newSize)
-	self.setData(data)
+func (bs *ByteStream) Expand() {
+	data := bs.GetData()
+	newSize := len(bs.base) * 2
+	bs.base = make([]byte, newSize)
+	bs.setData(data)
 }
 
-func (self *ByteStream) Shrink(minSize int) {
-	data := self.GetData()
+func (bs *ByteStream) Shrink(minSize int) {
+	data := bs.GetData()
 
 	if minSize < len(data) {
 		minSize = len(data)
@@ -108,48 +108,48 @@ func (self *ByteStream) Shrink(minSize int) {
 
 	minSize = int(utils.NextPowerOfTwo(int64(minSize)))
 
-	if len(self.base) == minSize {
+	if len(bs.base) == minSize {
 		return
 	}
 
-	self.base = make([]byte, minSize)
-	self.setData(data)
+	bs.base = make([]byte, minSize)
+	bs.setData(data)
 }
 
-func (self *ByteStream) GetData() []byte {
-	return self.base[self.dataOffset:self.bufferOffset]
+func (bs *ByteStream) GetData() []byte {
+	return bs.base[bs.dataOffset:bs.bufferOffset]
 }
 
-func (self *ByteStream) GetDataSize() int {
-	return self.bufferOffset - self.dataOffset
+func (bs *ByteStream) GetDataSize() int {
+	return bs.bufferOffset - bs.dataOffset
 }
 
-func (self *ByteStream) GetBuffer() []byte {
-	return self.base[self.bufferOffset:]
+func (bs *ByteStream) GetBuffer() []byte {
+	return bs.base[bs.bufferOffset:]
 }
 
-func (self *ByteStream) GetBufferSize() int {
-	return len(self.base) - self.bufferOffset
+func (bs *ByteStream) GetBufferSize() int {
+	return len(bs.base) - bs.bufferOffset
 }
 
-func (self *ByteStream) Size() int {
-	return len(self.base)
+func (bs *ByteStream) Size() int {
+	return len(bs.base)
 }
 
-func (self *ByteStream) doSkip(dataSize int) {
-	self.dataOffset += dataSize
+func (bs *ByteStream) doSkip(dataSize int) {
+	bs.dataOffset += dataSize
 
-	if self.dataOffset >= self.bufferOffset/2 {
-		self.setData(self.GetData())
+	if bs.dataOffset*2 >= bs.bufferOffset {
+		bs.setData(bs.GetData())
 	}
 }
 
-func (self *ByteStream) setData(data []byte) {
-	copy(self.base, data)
-	self.dataOffset = 0
-	self.bufferOffset = len(data)
+func (bs *ByteStream) setData(data []byte) {
+	copy(bs.base, data)
+	bs.dataOffset = 0
+	bs.bufferOffset = len(data)
 }
 
-func (self *ByteStream) doCommitBuffer(bufferSize int) {
-	self.bufferOffset += bufferSize
+func (bs *ByteStream) doCommitBuffer(bufferSize int) {
+	bs.bufferOffset += bufferSize
 }

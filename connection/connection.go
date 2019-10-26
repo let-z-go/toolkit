@@ -19,14 +19,14 @@ type Connection struct {
 	latestWriteCtx   context.Context
 }
 
-func (self *Connection) Init(underlying net.Conn) *Connection {
+func (c *Connection) Init(underlying net.Conn) *Connection {
 	utils.Assert(underlying != nil, func() string {
 		return "toolkit/connection: invalid argument: underlying is nil"
 	})
 
-	self.underlying = underlying
-	self.preReading = make(chan struct{}, 1)
-	self.preWriting = make(chan struct{}, 1)
+	c.underlying = underlying
+	c.preReading = make(chan struct{}, 1)
+	c.preWriting = make(chan struct{}, 1)
 
 	go func() {
 		readCtx := context.Background()
@@ -34,74 +34,74 @@ func (self *Connection) Init(underlying net.Conn) *Connection {
 
 		for {
 			select {
-			case _, ok := <-self.preReading:
+			case _, ok := <-c.preReading:
 				if !ok {
 					return
 				}
 
-				self.lockOfPreReading.Lock()
-				readCtx = self.latestReadCtx
-				self.lockOfPreReading.Unlock()
-			case _, ok := <-self.preWriting:
+				c.lockOfPreReading.Lock()
+				readCtx = c.latestReadCtx
+				c.lockOfPreReading.Unlock()
+			case _, ok := <-c.preWriting:
 				if !ok {
 					return
 				}
 
-				self.lockOfPreWriting.Lock()
-				writeCtx = self.latestWriteCtx
-				self.lockOfPreWriting.Unlock()
+				c.lockOfPreWriting.Lock()
+				writeCtx = c.latestWriteCtx
+				c.lockOfPreWriting.Unlock()
 			case <-readCtx.Done():
-				self.lockOfPreReading.Lock()
+				c.lockOfPreReading.Lock()
 
-				if readCtx == self.latestReadCtx {
+				if readCtx == c.latestReadCtx {
 					underlying.SetReadDeadline(time.Now())
 				}
 
-				self.lockOfPreReading.Unlock()
+				c.lockOfPreReading.Unlock()
 				readCtx = context.Background()
 			case <-writeCtx.Done():
-				self.lockOfPreWriting.Lock()
+				c.lockOfPreWriting.Lock()
 
-				if writeCtx == self.latestWriteCtx {
+				if writeCtx == c.latestWriteCtx {
 					underlying.SetWriteDeadline(time.Now())
 				}
 
-				self.lockOfPreWriting.Unlock()
+				c.lockOfPreWriting.Unlock()
 				writeCtx = context.Background()
 			}
 		}
 	}()
 
-	return self
+	return c
 }
 
-func (self *Connection) Close() error {
-	close(self.preReading)
-	close(self.preWriting)
-	underlying := self.underlying
-	self.underlying = nil
+func (c *Connection) Close() error {
+	close(c.preReading)
+	close(c.preWriting)
+	underlying := c.underlying
+	c.underlying = nil
 	return underlying.Close()
 }
 
-func (self *Connection) Read(ctx context.Context, deadline time.Time, buffer []byte) (int, error) {
-	self.PreRead(ctx, deadline)
-	return self.DoRead(ctx, buffer)
+func (c *Connection) Read(ctx context.Context, deadline time.Time, buffer []byte) (int, error) {
+	c.PreRead(ctx, deadline)
+	return c.DoRead(ctx, buffer)
 }
 
-func (self *Connection) PreRead(ctx context.Context, deadline time.Time) {
-	self.lockOfPreReading.Lock()
-	self.latestReadCtx = ctx
-	self.underlying.SetReadDeadline(deadline)
-	self.lockOfPreReading.Unlock()
+func (c *Connection) PreRead(ctx context.Context, deadline time.Time) {
+	c.lockOfPreReading.Lock()
+	c.latestReadCtx = ctx
+	c.underlying.SetReadDeadline(deadline)
+	c.lockOfPreReading.Unlock()
 
 	select {
-	case self.preReading <- struct{}{}:
+	case c.preReading <- struct{}{}:
 	default:
 	}
 }
 
-func (self *Connection) DoRead(ctx context.Context, buffer []byte) (int, error) {
-	n, err := self.underlying.Read(buffer)
+func (c *Connection) DoRead(ctx context.Context, buffer []byte) (int, error) {
+	n, err := c.underlying.Read(buffer)
 
 	if err != nil {
 		if err2 := ctx.Err(); err2 != nil {
@@ -112,25 +112,25 @@ func (self *Connection) DoRead(ctx context.Context, buffer []byte) (int, error) 
 	return n, err
 }
 
-func (self *Connection) Write(ctx context.Context, deadline time.Time, data []byte) (int, error) {
-	self.PreWrite(ctx, deadline)
-	return self.DoWrite(ctx, data)
+func (c *Connection) Write(ctx context.Context, deadline time.Time, data []byte) (int, error) {
+	c.PreWrite(ctx, deadline)
+	return c.DoWrite(ctx, data)
 }
 
-func (self *Connection) PreWrite(ctx context.Context, deadline time.Time) {
-	self.lockOfPreWriting.Lock()
-	self.latestWriteCtx = ctx
-	self.underlying.SetWriteDeadline(deadline)
-	self.lockOfPreWriting.Unlock()
+func (c *Connection) PreWrite(ctx context.Context, deadline time.Time) {
+	c.lockOfPreWriting.Lock()
+	c.latestWriteCtx = ctx
+	c.underlying.SetWriteDeadline(deadline)
+	c.lockOfPreWriting.Unlock()
 
 	select {
-	case self.preWriting <- struct{}{}:
+	case c.preWriting <- struct{}{}:
 	default:
 	}
 }
 
-func (self *Connection) DoWrite(ctx context.Context, data []byte) (int, error) {
-	n, err := self.underlying.Write(data)
+func (c *Connection) DoWrite(ctx context.Context, data []byte) (int, error) {
+	n, err := c.underlying.Write(data)
 
 	if err != nil {
 		if err2 := ctx.Err(); err2 != nil {
@@ -141,6 +141,6 @@ func (self *Connection) DoWrite(ctx context.Context, data []byte) (int, error) {
 	return n, err
 }
 
-func (self *Connection) IsClosed() bool {
-	return self.underlying == nil
+func (c *Connection) IsClosed() bool {
+	return c.underlying == nil
 }

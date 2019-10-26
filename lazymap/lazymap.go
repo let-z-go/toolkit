@@ -1,6 +1,7 @@
 package lazymap
 
 import (
+	"context"
 	"sync"
 )
 
@@ -8,53 +9,86 @@ type LazyMap struct {
 	base sync.Map
 }
 
-func (self *LazyMap) GetOrSetValue(key interface{}, valueFactory func() (interface{}, error)) (interface{}, func(), error) {
-retry:
-	value, _ := self.base.LoadOrStore(key, &lock{})
-	valueClearer := (func())(nil)
+func (lm *LazyMap) GetOrSetValue(ctx context.Context, key interface{}, valueFactory ValueFactory) (interface{}, ValueClearer, error) {
+	value, ok := lm.base.Load(key)
 
-	if lock_, ok := value.(*lock); ok {
-	retry2:
-		lock_.Lock()
-		value2, ok := self.base.Load(key)
+	if !ok {
+		value, _ = lm.base.LoadOrStore(key, new(lock).Init())
+	}
 
-		if !ok {
-			lock_.Unlock()
-			goto retry
-		}
+Fallback:
+	lock_, ok := value.(*lock)
 
-		if lock2, ok := value2.(*lock); ok {
-			if lock2 != lock_ {
-				lock_.Unlock()
-				lock_ = lock2
-				goto retry2
-			}
+	if !ok {
+		return value, nil, nil
+	}
 
-			var err error
-			value2, err = valueFactory()
+Fallback2:
+	if err := lock_.Acquire(ctx); err != nil {
+		return nil, nil, err
+	}
 
-			if err != nil {
-				lock_.Unlock()
-				return nil, nil, err
-			}
+	value, ok = lm.base.Load(key)
 
-			self.base.Store(key, value2)
-			once := sync.Once{}
+	if !ok {
+		lock_.Release()
+		value, _ = lm.base.LoadOrStore(key, new(lock).Init())
+		goto Fallback
+	}
 
-			valueClearer = func() {
-				once.Do(func() {
-					self.base.Delete(key)
-				})
-			}
-		}
+	lock2, ok := value.(*lock)
 
-		lock_.Unlock()
-		value = value2
+	if !ok {
+		lock_.Release()
+		return value, nil, nil
+	}
+
+	if lock_ != lock2 {
+		lock_.Release()
+		lock_ = lock2
+		goto Fallback2
+	}
+
+	var err error
+	value, err = valueFactory(ctx)
+
+	if err != nil {
+		lock_.Release()
+		return nil, nil, err
+	}
+
+	lm.base.Store(key, value)
+	lock_.Release()
+	once := sync.Once{}
+
+	valueClearer := func() {
+		once.Do(func() {
+			lm.base.Delete(key)
+		})
 	}
 
 	return value, valueClearer, nil
 }
 
-type lock struct {
-	sync.Mutex
+type ValueFactory func(ctx context.Context) (value interface{}, err error)
+type ValueClearer func()
+
+type lock chan struct{}
+
+func (l *lock) Init() *lock {
+	*l = make(chan struct{}, 1)
+	return l
+}
+
+func (l lock) Acquire(ctx context.Context) error {
+	select {
+	case l <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (l lock) Release() {
+	<-l
 }

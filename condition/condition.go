@@ -5,25 +5,25 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/let-z-go/intrusives/list"
+	"github.com/let-z-go/intrusive"
 )
 
 type Condition struct {
 	lock          sync.Locker
-	listOfWaiters list.List
+	listOfWaiters intrusive.List
 }
 
-func (self *Condition) Init(lock sync.Locker) *Condition {
-	self.lock = lock
-	self.listOfWaiters.Init()
-	return self
+func (c *Condition) Init(lock sync.Locker) *Condition {
+	c.lock = lock
+	c.listOfWaiters.Init()
+	return c
 }
 
-func (self *Condition) WaitFor(ctx context.Context) (bool, error) {
+func (c *Condition) WaitFor(ctx context.Context) (bool, error) {
 	var waiter conditionWaiter
 	waiter.Event = make(chan struct{})
-	self.listOfWaiters.AppendNode(&waiter.ListNode)
-	self.lock.Unlock()
+	c.listOfWaiters.AppendNode(&waiter.ListNode)
+	c.lock.Unlock()
 	var err error
 
 	select {
@@ -33,7 +33,7 @@ func (self *Condition) WaitFor(ctx context.Context) (bool, error) {
 		err = ctx.Err()
 	}
 
-	self.lock.Lock()
+	c.lock.Lock()
 	ok := err == nil || waiter.ListNode.IsReset()
 
 	if !ok {
@@ -43,19 +43,19 @@ func (self *Condition) WaitFor(ctx context.Context) (bool, error) {
 	return ok, err
 }
 
-func (self *Condition) Signal() {
-	if self.listOfWaiters.IsEmpty() {
+func (c *Condition) Signal() {
+	if c.listOfWaiters.IsEmpty() {
 		return
 	}
 
-	waiter := (*conditionWaiter)(self.listOfWaiters.Head().GetContainer(unsafe.Offsetof(conditionWaiter{}.ListNode)))
+	waiter := (*conditionWaiter)(c.listOfWaiters.Head().GetContainer(unsafe.Offsetof(conditionWaiter{}.ListNode)))
 	waiter.ListNode.Remove()
 	waiter.ListNode.Reset()
 	close(waiter.Event)
 }
 
-func (self *Condition) Broadcast() {
-	getNode := self.listOfWaiters.GetNodesSafely()
+func (c *Condition) Broadcast() {
+	getNode := c.listOfWaiters.GetNodesSafely()
 
 	for listNode := getNode(); listNode != nil; listNode = getNode() {
 		listNode.Reset()
@@ -63,10 +63,10 @@ func (self *Condition) Broadcast() {
 		close(waiter.Event)
 	}
 
-	self.listOfWaiters.Init()
+	c.listOfWaiters.Init()
 }
 
 type conditionWaiter struct {
-	ListNode list.ListNode
+	ListNode intrusive.ListNode
 	Event    chan struct{}
 }
