@@ -36,38 +36,38 @@ func (s *Semaphore) Init(minValue int, maxValue int, value int) *Semaphore {
 	return s
 }
 
-func (s *Semaphore) Close(callback func()) (int, error) {
+func (s *Semaphore) Close(callback func(int)) (int, error) {
 	if !atomic.CompareAndSwapInt32(&s.isClosed, 0, 1) {
 		return 0, ErrSemaphoreClosed
 	}
 
 	s.lock.Lock()
-
-	if callback != nil {
-		callback()
-	}
-
 	s.upCondition.Broadcast()
 	s.downCondition.Broadcast()
+
+	if callback != nil {
+		callback(s.value)
+	}
+
 	s.lock.Unlock()
 	return s.value, nil
 }
 
-func (s *Semaphore) Up(ctx context.Context, increaseMinValue bool, callback func()) error {
+func (s *Semaphore) Up(ctx context.Context, increaseMinValue bool, callback func(int)) error {
 	_, err := s.doUp(ctx, false, increaseMinValue, callback)
 	return err
 }
 
-func (s *Semaphore) UpAll(ctx context.Context, increaseMinValue bool, callback func()) (int, error) {
+func (s *Semaphore) UpAll(ctx context.Context, increaseMinValue bool, callback func(int)) (int, error) {
 	return s.doUp(ctx, true, increaseMinValue, callback)
 }
 
-func (s *Semaphore) Down(ctx context.Context, decreaseMaxValue bool, callback func()) error {
+func (s *Semaphore) Down(ctx context.Context, decreaseMaxValue bool, callback func(int)) error {
 	_, err := s.doDown(ctx, false, decreaseMaxValue, callback)
 	return err
 }
 
-func (s *Semaphore) DownAll(ctx context.Context, decreaseMaxValue bool, callback func()) (int, error) {
+func (s *Semaphore) DownAll(ctx context.Context, decreaseMaxValue bool, callback func(int)) (int, error) {
 	return s.doDown(ctx, true, decreaseMaxValue, callback)
 }
 
@@ -81,11 +81,6 @@ func (s *Semaphore) IncreaseMaxValue(increment int, increaseValue bool, callback
 	}
 
 	s.lock.Lock()
-
-	if callback != nil {
-		callback()
-	}
-
 	s.maxValue += increment
 
 	if increaseValue {
@@ -100,8 +95,45 @@ func (s *Semaphore) IncreaseMaxValue(increment int, increaseValue bool, callback
 		}
 	}
 
+	if callback != nil {
+		callback()
+	}
+
 	s.lock.Unlock()
 	return nil
+}
+
+func (s *Semaphore) DecreaseMaxValue(decrement int, callback func(int)) (int, error) {
+	if s.IsClosed() {
+		return 0, ErrSemaphoreClosed
+	}
+
+	if decrement < 1 {
+		return 0, nil
+	}
+
+	s.lock.Lock()
+	s.maxValue -= decrement
+
+	if s.maxValue < s.minValue {
+		s.maxValue = s.minValue
+	}
+
+	var delta int
+
+	if s.value <= s.maxValue {
+		delta = 0
+	} else {
+		delta = s.maxValue - s.value
+		s.value = s.maxValue
+	}
+
+	if callback != nil {
+		callback(delta)
+	}
+
+	s.lock.Unlock()
+	return delta, nil
 }
 
 func (s *Semaphore) DecreaseMinValue(decrement int, decreaseValue bool, callback func()) error {
@@ -114,11 +146,6 @@ func (s *Semaphore) DecreaseMinValue(decrement int, decreaseValue bool, callback
 	}
 
 	s.lock.Lock()
-
-	if callback != nil {
-		callback()
-	}
-
 	s.minValue -= decrement
 
 	if decreaseValue {
@@ -133,8 +160,45 @@ func (s *Semaphore) DecreaseMinValue(decrement int, decreaseValue bool, callback
 		}
 	}
 
+	if callback != nil {
+		callback()
+	}
+
 	s.lock.Unlock()
 	return nil
+}
+
+func (s *Semaphore) IncreaseMinValue(increment int, callback func(int)) (int, error) {
+	if s.IsClosed() {
+		return 0, ErrSemaphoreClosed
+	}
+
+	if increment < 1 {
+		return 0, nil
+	}
+
+	s.lock.Lock()
+	s.minValue += increment
+
+	if s.minValue > s.maxValue {
+		s.minValue = s.maxValue
+	}
+
+	var delta int
+
+	if s.value >= s.minValue {
+		delta = 0
+	} else {
+		delta = s.minValue - s.value
+		s.value = s.minValue
+	}
+
+	if callback != nil {
+		callback(delta)
+	}
+
+	s.lock.Unlock()
+	return delta, nil
 }
 
 func (s *Semaphore) IsClosed() bool {
@@ -162,7 +226,7 @@ func (s *Semaphore) Value() int {
 	return value
 }
 
-func (s *Semaphore) doUp(ctx context.Context, maximizeIncrement bool, increaseMinValue bool, callback func()) (int, error) {
+func (s *Semaphore) doUp(ctx context.Context, maximizeIncrement bool, increaseMinValue bool, callback func(int)) (int, error) {
 	if s.IsClosed() {
 		return 0, ErrSemaphoreClosed
 	}
@@ -208,10 +272,6 @@ func (s *Semaphore) doUp(ctx context.Context, maximizeIncrement bool, increaseMi
 		s.upWaiterCount--
 	}
 
-	if callback != nil {
-		callback()
-	}
-
 	var increment int
 
 	if maximizeIncrement {
@@ -234,11 +294,15 @@ func (s *Semaphore) doUp(ctx context.Context, maximizeIncrement bool, increaseMi
 		}
 	}
 
+	if callback != nil {
+		callback(increment)
+	}
+
 	s.lock.Unlock()
 	return increment, nil
 }
 
-func (s *Semaphore) doDown(ctx context.Context, maximizeDecrement bool, decreaseMaxValue bool, callback func()) (int, error) {
+func (s *Semaphore) doDown(ctx context.Context, maximizeDecrement bool, decreaseMaxValue bool, callback func(int)) (int, error) {
 	if s.IsClosed() {
 		return 0, ErrSemaphoreClosed
 	}
@@ -284,10 +348,6 @@ func (s *Semaphore) doDown(ctx context.Context, maximizeDecrement bool, decrease
 		s.downWaiterCount--
 	}
 
-	if callback != nil {
-		callback()
-	}
-
 	var decrement int
 
 	if maximizeDecrement {
@@ -308,6 +368,10 @@ func (s *Semaphore) doDown(ctx context.Context, maximizeDecrement bool, decrease
 		if s.value+decrement == s.maxValue {
 			s.notifyUpWaiter()
 		}
+	}
+
+	if callback != nil {
+		callback(decrement)
 	}
 
 	s.lock.Unlock()

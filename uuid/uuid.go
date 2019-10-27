@@ -8,6 +8,10 @@ import (
 
 type UUID [2]uint64
 
+func MakeUUID(low uint64, high uint64) UUID {
+	return UUID{low, high}
+}
+
 func (u UUID) IsZero() bool {
 	return (u[0] | u[1]) == 0
 }
@@ -54,10 +58,6 @@ func GenerateUUID4Fast() UUID {
 	uuid[0] = ((uuid[0] ^ mask[0]) & 0xFF0FFFFFFFFFFFFF) | 0x0040000000000000
 	uuid[1] = ((uuid[1] ^ mask[1]) & 0xFFFFFFFFFFFFFF3F) | 0x0000000000000080
 	return uuid
-}
-
-func MakeUUID(low uint64, high uint64) UUID {
-	return UUID{low, high}
 }
 
 var hexDigits = [...]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}

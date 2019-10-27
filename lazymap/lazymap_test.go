@@ -19,20 +19,22 @@ func TestLazyMap(t *testing.T) {
 		wg.Add(1)
 
 		go func(i int) {
-			v, vc, _ := lm.GetOrSetValue(context.Background(), "k", func(context.Context) (interface{}, error) {
-				time.Sleep(time.Second / 100)
-				return "v", nil
-			})
+			for i := 0; i < 100; i++ {
+				v, vc, _ := lm.GetOrSetValue(context.Background(), "k", func(context.Context) (interface{}, error) {
+					time.Sleep(time.Duration(rand.Intn(3)) * time.Millisecond)
+					return "v", nil
+				})
 
-			if v != "v" {
-				t.Errorf("%#v!=\"v\"", v)
+				if v != "v" {
+					t.Errorf("%#v!=\"v\"", v)
+				}
+
+				if vc != nil {
+					time.Sleep(time.Duration(rand.Intn(3)) * time.Millisecond)
+					vc()
+					atomic.AddInt32(&c, 1)
+				}
 			}
-
-			if vc != nil {
-				vc()
-				atomic.AddInt32(&c, 1)
-			}
-
 			wg.Done()
 		}(i)
 	}

@@ -92,3 +92,43 @@ func TestDeque2(t *testing.T) {
 		t.Errorf("%#v", ec)
 	}
 }
+
+func TestShrinkDeque(t *testing.T) {
+	d := new(Deque).Init(8)
+
+	for i := 0; i < 6; i++ {
+		d.AppendNode(context.Background(), &(&Foo{bar: i}).listNode)
+	}
+
+	l := NewList()
+	d.Shrink(4, false, l)
+	if l.Length != 2 {
+		t.Fatal(l.Length)
+	}
+	if d.Length() != 4 {
+		t.Fatal(d.Length())
+	}
+	getNode := l.Underlying.GetNodes()
+
+	for i, ln := 0, getNode(); ln != nil; i, ln = i+1, getNode() {
+		if f := (*Foo)(ln.GetContainer(unsafe.Offsetof(Foo{}.listNode))); f.bar != i+4 {
+			t.Errorf("%#v", f.bar)
+		}
+	}
+
+	l = NewList()
+	d.Shrink(2, true, l)
+	if l.Length != 2 {
+		t.Fatal(l.Length)
+	}
+	if d.Length() != 2 {
+		t.Fatal(d.Length())
+	}
+	getNode = l.Underlying.GetNodes()
+
+	for i, ln := 0, getNode(); ln != nil; i, ln = i+1, getNode() {
+		if f := (*Foo)(ln.GetContainer(unsafe.Offsetof(Foo{}.listNode))); f.bar != i {
+			t.Errorf("%#v", f.bar)
+		}
+	}
+}

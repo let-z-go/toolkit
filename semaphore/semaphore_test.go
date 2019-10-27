@@ -198,3 +198,76 @@ func TestSemaphore6(t *testing.T) {
 		wg.Wait()
 	}
 }
+
+func TestSemaphore7(t *testing.T) {
+	{
+		s := new(Semaphore).Init(0, 10, 9)
+		d, _ := s.DecreaseMaxValue(1, nil)
+		if d != 0 {
+			t.Fatal(d)
+		}
+		f := int32(0)
+		go func() {
+			s.Up(context.Background(), false, nil)
+			atomic.StoreInt32(&f, 1)
+		}()
+		time.Sleep(100 * time.Millisecond)
+		if f2 := atomic.LoadInt32(&f); f2 != 0 {
+			t.Fatal(f2)
+		}
+		d, _ = s.DecreaseMaxValue(1, nil)
+		if d != -1 {
+			t.Fatal(d)
+		}
+		time.Sleep(100 * time.Millisecond)
+		if f2 := atomic.LoadInt32(&f); f2 != 0 {
+			t.Fatal(f2)
+		}
+		if v := s.Value(); v != 8 {
+			t.Fatal(v)
+		}
+		s.IncreaseMaxValue(1, false, nil)
+		if v := s.MaxValue(); v != 9 {
+			t.Fatal(v)
+		}
+		time.Sleep(100 * time.Millisecond)
+		if f2 := atomic.LoadInt32(&f); f2 != 1 {
+			t.Fatal(f2)
+		}
+	}
+	{
+		s := new(Semaphore).Init(0, 10, 1)
+		d, _ := s.IncreaseMinValue(1, nil)
+		if d != 0 {
+			t.Fatal(d)
+		}
+		f := int32(0)
+		go func() {
+			s.Down(context.Background(), false, nil)
+			atomic.StoreInt32(&f, 1)
+		}()
+		time.Sleep(100 * time.Millisecond)
+		if f2 := atomic.LoadInt32(&f); f2 != 0 {
+			t.Fatal(f2)
+		}
+		d, _ = s.IncreaseMinValue(1, nil)
+		if d != 1 {
+			t.Fatal(d)
+		}
+		time.Sleep(100 * time.Millisecond)
+		if f2 := atomic.LoadInt32(&f); f2 != 0 {
+			t.Fatal(f2)
+		}
+		if v := s.Value(); v != 2 {
+			t.Fatal(v)
+		}
+		s.DecreaseMinValue(1, false, nil)
+		if v := s.MinValue(); v != 1 {
+			t.Fatal(v)
+		}
+		time.Sleep(100 * time.Millisecond)
+		if f2 := atomic.LoadInt32(&f); f2 != 1 {
+			t.Fatal(f2)
+		}
+	}
+}
